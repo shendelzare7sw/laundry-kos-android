@@ -91,6 +91,7 @@ fun PropertiPickerScreen(
     onUbahProperti: (Int, SimpanPropertiRequestDto, onUpdated: () -> Unit) -> Unit,
     onOpenSetup: (Int) -> Unit,
     onOpenPengguna: () -> Unit,
+    onClearDialogError: () -> Unit,
     onClearSnackbar: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -158,7 +159,10 @@ fun PropertiPickerScreen(
                 },
                 actions = {
                     Button(
-                        onClick = { showTambahDialog = true },
+                        onClick = {
+                            onClearDialogError()
+                            showTambahDialog = true
+                        },
                         shape = RoundedCornerShape(999.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -244,7 +248,10 @@ fun PropertiPickerScreen(
                                     canManage = properti.bolehUbah || isGlobalRole,
                                     enabled = !uiState.isSubmitting,
                                     onOpen = { onSelect(properti.id) },
-                                    onEdit = { editTarget = properti },
+                                    onEdit = {
+                                        onClearDialogError()
+                                        editTarget = properti
+                                    },
                                     onSetup = { onOpenSetup(properti.id) },
                                     modifier = Modifier.weight(1f),
                                 )
@@ -260,7 +267,10 @@ fun PropertiPickerScreen(
                             canManage = properti.bolehUbah || isGlobalRole,
                             enabled = !uiState.isSubmitting,
                             onOpen = { onSelect(properti.id) },
-                            onEdit = { editTarget = properti },
+                            onEdit = {
+                                onClearDialogError()
+                                editTarget = properti
+                            },
                             onSetup = { onOpenSetup(properti.id) },
                         )
                     }
@@ -275,7 +285,11 @@ fun PropertiPickerScreen(
             title = "Tambah Properti Baru",
             initial = null,
             submitting = uiState.isSubmitting,
-            onDismiss = { showTambahDialog = false },
+            errorMessage = uiState.dialogError,
+            onDismiss = {
+                onClearDialogError()
+                showTambahDialog = false
+            },
             onSubmit = { req ->
                 onTambahProperti(req) { created ->
                     showTambahDialog = false
@@ -293,7 +307,11 @@ fun PropertiPickerScreen(
             title = "Edit Properti",
             initial = prop,
             submitting = uiState.isSubmitting,
-            onDismiss = { editTarget = null },
+            errorMessage = uiState.dialogError,
+            onDismiss = {
+                onClearDialogError()
+                editTarget = null
+            },
             onSubmit = { req ->
                 onUbahProperti(prop.id, req) {
                     editTarget = null
@@ -507,6 +525,7 @@ private fun PropertiFormDialog(
     title: String,
     initial: PropertiDto?,
     submitting: Boolean,
+    errorMessage: String?,
     onDismiss: () -> Unit,
     onSubmit: (SimpanPropertiRequestDto) -> Unit,
 ) {
@@ -527,6 +546,9 @@ private fun PropertiFormDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (!errorMessage.isNullOrBlank()) {
+                    ErrorBannerCard(message = errorMessage)
+                }
                 OutlinedTextField(
                     value = nama,
                     onValueChange = {

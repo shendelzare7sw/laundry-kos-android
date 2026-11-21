@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
 
 sealed interface GlobalApiEvent {
     data class Unauthorized(val message: String) : GlobalApiEvent
+    data class SessionRevoked(val code: String?, val message: String) : GlobalApiEvent
     data class PropertiRequired(val propertiList: List<PropertiDto>, val message: String) : GlobalApiEvent
 }
 
@@ -128,7 +129,9 @@ suspend inline fun <T> safeApiCall(
         ApiResult.Success(block())
     } catch (t: Throwable) {
         val error = ApiErrorParser.fromThrowable(t)
-        if (error.isUnauthorized) {
+        if (error.isAccountOrPropertyBlocked) {
+            eventBus?.emit(GlobalApiEvent.SessionRevoked(error.code, error.message))
+        } else if (error.isUnauthorized) {
             eventBus?.emit(GlobalApiEvent.Unauthorized(error.message))
         } else if (error.isPropertiBelumDipilih) {
             eventBus?.emit(GlobalApiEvent.PropertiRequired(error.propertiList, error.message))

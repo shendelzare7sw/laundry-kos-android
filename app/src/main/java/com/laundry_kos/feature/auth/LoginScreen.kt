@@ -1,5 +1,6 @@
 package com.laundry_kos.feature.auth
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,21 +17,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -50,7 +57,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.laundry_kos.BuildConfig
 import com.laundry_kos.R
-import com.laundry_kos.core.designsystem.ErrorBannerCard
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.MaroonPrimaryButton
@@ -102,13 +108,34 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Banner sesi dicabut / akun dinonaktifkan / info keluar normal
         if (!uiState.bannerMessage.isNullOrBlank()) {
-            ErrorBannerCard(message = uiState.bannerMessage)
+            LoginNoticeBanner(
+                title = uiState.bannerTitle,
+                message = uiState.bannerMessage,
+                isError = uiState.bannerIsError,
+                isBlocked = uiState.bannerTitle == "Akun Dinonaktifkan" || uiState.bannerTitle == "Properti Tidak Aktif",
+                modifier = Modifier.widthIn(max = 460.dp),
+            )
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        if (uiState.loginError != null && usernameError == null && passwordError == null) {
-            ErrorBannerCard(message = uiState.loginError.summaryMessage())
+        // Banner error login (termasuk blokir akun nonaktif, properti nonaktif, rate limit 429, atau gangguan jaringan)
+        val loginErr = uiState.loginError
+        if (loginErr != null && usernameError == null && passwordError == null) {
+            val blockedTitle = when (loginErr.code) {
+                "AKUN_NONAKTIF" -> "Akun Dinonaktifkan"
+                "PROPERTI_TIDAK_AKTIF", "PROPERTI_TIDAK_TERIKAT" -> "Properti Tidak Aktif"
+                "TOO_MANY_REQUESTS" -> "Terlalu Banyak Percobaan"
+                else -> if (loginErr.httpCode == 403) "Akses Masuk Ditolak" else "Gagal Masuk"
+            }
+            LoginNoticeBanner(
+                title = blockedTitle,
+                message = loginErr.summaryMessage(),
+                isError = true,
+                isBlocked = loginErr.isAccountOrPropertyBlocked || loginErr.httpCode == 403,
+                modifier = Modifier.widthIn(max = 460.dp),
+            )
             Spacer(modifier = Modifier.height(12.dp))
         }
 
@@ -124,6 +151,7 @@ fun LoginScreen(
                     onValueChange = { username = it },
                     label = { Text("Username") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     isError = usernameError != null,
                     supportingText = usernameError?.let { { Text(it) } },
                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
@@ -139,6 +167,7 @@ fun LoginScreen(
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     isError = passwordError != null,
                     supportingText = passwordError?.let { { Text(it) } },
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
@@ -157,7 +186,7 @@ fun LoginScreen(
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {
-                            if (username.isNotBlank() && password.isNotBlank()) {
+                            if (username.isNotBlank() && password.isNotBlank() && !uiState.isLoggingIn) {
                                 onLogin(username, password)
                             }
                         },
@@ -184,7 +213,10 @@ fun LoginScreen(
             }
 
             if (showServerConfig) {
-                LaundryCard(containerColor = ext.surfaceAlt) {
+                LaundryCard(
+                    modifier = Modifier.widthIn(max = 460.dp),
+                    containerColor = ext.surfaceAlt,
+                ) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
                             text = "Pilih Server Lokal (Debug)",
@@ -215,6 +247,7 @@ fun LoginScreen(
                             onValueChange = { customUrlInput = it },
                             label = { Text("Base URL API (IP LAN / Custom)") },
                             singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Row(
@@ -229,6 +262,65 @@ fun LoginScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoginNoticeBanner(
+    title: String?,
+    message: String,
+    isError: Boolean,
+    isBlocked: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val ext = LaundryKosTheme.extendedColors
+    val bgColor = if (isError) ext.dangerContainer else ext.okContainer
+    val borderColor = if (isError) ext.danger.copy(alpha = 0.40f) else ext.ok.copy(alpha = 0.35f)
+    val iconColor = if (isError) ext.danger else ext.ok
+    val titleColor = if (isError) ext.danger else ext.ok
+    val textColor = if (isError) ext.maroonDarker else MaterialTheme.colorScheme.onSurface
+    val icon = when {
+        !isError -> Icons.Default.CheckCircle
+        isBlocked -> Icons.Default.Block
+        else -> Icons.Default.Warning
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = bgColor,
+        border = BorderStroke(1.dp, borderColor),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(20.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                if (!title.isNullOrBlank()) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = titleColor,
+                    )
+                }
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor,
+                )
             }
         }
     }

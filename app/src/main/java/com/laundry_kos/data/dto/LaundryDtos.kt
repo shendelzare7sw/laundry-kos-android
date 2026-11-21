@@ -118,6 +118,7 @@ data class InfoKuotaPreviewDto(
 data class DuplikatLaundryDto(
     val id: Int,
     @SerialName("url_ubah") val urlUbah: String? = null,
+    @SerialName("boleh_ubah") val bolehUbah: Boolean = true,
 )
 
 @Serializable

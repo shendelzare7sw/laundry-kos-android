@@ -21,7 +21,9 @@ data class PenghuniDetailUiState(
     val data: PenghuniDetailResponseDto? = null,
     val error: String? = null,
     val actionLoading: Boolean = false,
+    val dialogError: String? = null,
     val snackbarMessage: String? = null,
+    val hasMutated: Boolean = false,
     val kamarKosong: List<KamarDto> = emptyList(),
 )
 
@@ -40,6 +42,10 @@ class PenghuniDetailViewModel(
     fun changeBulan(newBulan: String) {
         _state.update { it.copy(bulan = newBulan) }
         load()
+    }
+
+    fun clearDialogError() {
+        _state.update { it.copy(dialogError = null) }
     }
 
     fun load(isRefresh: Boolean = false) {
@@ -71,17 +77,17 @@ class PenghuniDetailViewModel(
         }
     }
 
-    fun ubahData(request: UbahPenghuniRequestDto) {
-        runAction {
+    fun ubahData(request: UbahPenghuniRequestDto, onSuccess: () -> Unit) {
+        runDialogAction(onSuccess) {
             val res = repository.ubahPenghuni(penghuniId, request)
-            handleMutasi(res) { it.message }
+            handleDialogMutasi(res, onSuccess) { it.message }
         }
     }
 
-    fun gantiNomor(noWa: String?) {
-        runAction {
+    fun gantiNomor(noWa: String?, onSuccess: () -> Unit) {
+        runDialogAction(onSuccess) {
             val res = repository.gantiNomor(penghuniId, noWa)
-            handleMutasi(res) { r ->
+            handleDialogMutasi(res, onSuccess) { r ->
                 buildString {
                     append(r.message)
                     r.peringatan?.takeIf { it.isNotBlank() }?.let { append(" ($it)") }
@@ -90,10 +96,10 @@ class PenghuniDetailViewModel(
         }
     }
 
-    fun pindahKamar(kamarTujuanId: Int, tanggalPindah: String) {
-        runAction {
+    fun pindahKamar(kamarTujuanId: Int, tanggalPindah: String, onSuccess: () -> Unit) {
+        runDialogAction(onSuccess) {
             val res = repository.pindahKamar(penghuniId, PindahKamarRequestDto(kamarTujuanId, tanggalPindah))
-            handleMutasi(res) { it.message }
+            handleDialogMutasi(res, onSuccess) { it.message }
         }
     }
 
@@ -104,13 +110,13 @@ class PenghuniDetailViewModel(
         }
     }
 
-    fun keluar(tanggalKeluar: String, alasan: String?) {
-        runAction {
+    fun keluar(tanggalKeluar: String, alasan: String?, onSuccess: () -> Unit) {
+        runDialogAction(onSuccess) {
             val res = repository.keluarPenghuni(
                 penghuniId,
                 KeluarPenghuniRequestDto(tanggalKeluar, alasan?.takeIf { it.isNotBlank() }),
             )
-            handleMutasi(res) { it.message }
+            handleDialogMutasi(res, onSuccess) { it.message }
         }
     }
 
@@ -121,8 +127,8 @@ class PenghuniDetailViewModel(
         }
     }
 
-    fun simpanPenyesuaianKuota(nominal: Int?, reset: Boolean, catatan: String?) {
-        runAction {
+    fun simpanPenyesuaianKuota(nominal: Int?, reset: Boolean, catatan: String?, onSuccess: () -> Unit) {
+        runDialogAction(onSuccess) {
             val res = repository.simpanPenyesuaianKuota(
                 penghuniId,
                 PenyesuaianKuotaRequestDto(
@@ -132,7 +138,7 @@ class PenghuniDetailViewModel(
                     catatan = catatan?.takeIf { it.isNotBlank() },
                 ),
             )
-            handleMutasi(res) { it.message }
+            handleDialogMutasi(res, onSuccess) { it.message }
         }
     }
 
@@ -144,14 +150,41 @@ class PenghuniDetailViewModel(
         }
     }
 
+    private fun runDialogAction(@Suppress("UNUSED_PARAMETER") onSuccess: () -> Unit, block: suspend () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(actionLoading = true, dialogError = null) }
+            block()
+            _state.update { it.copy(actionLoading = false) }
+        }
+    }
+
     private fun <T> handleMutasi(res: ApiResult<T>, messageOf: (T) -> String) {
         when (res) {
             is ApiResult.Success -> {
-                _state.update { it.copy(snackbarMessage = messageOf(res.data)) }
+                _state.update { it.copy(snackbarMessage = messageOf(res.data), hasMutated = true) }
                 load(isRefresh = true)
             }
             is ApiResult.Failure -> {
                 _state.update { it.copy(snackbarMessage = res.error.summaryMessage()) }
+            }
+        }
+    }
+
+    private fun <T> handleDialogMutasi(res: ApiResult<T>, onSuccess: () -> Unit, messageOf: (T) -> String) {
+        when (res) {
+            is ApiResult.Success -> {
+                _state.update {
+                    it.copy(
+                        dialogError = null,
+                        snackbarMessage = messageOf(res.data),
+                        hasMutated = true,
+                    )
+                }
+                onSuccess()
+                load(isRefresh = true)
+            }
+            is ApiResult.Failure -> {
+                _state.update { it.copy(dialogError = res.error.summaryMessage()) }
             }
         }
     }

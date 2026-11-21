@@ -55,6 +55,7 @@ import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.MaroonPrimaryButton
 import com.laundry_kos.core.designsystem.SearchableDropdownField
 import com.laundry_kos.core.designsystem.StatusBadge
+import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,10 +68,17 @@ fun LaundryFormScreen(
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val ext = LaundryKosTheme.extendedColors
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(uiState.savedMessage) {
         if (uiState.savedMessage != null) {
             onSaved()
+        }
+    }
+
+    LaunchedEffect(uiState.submitError) {
+        if (uiState.submitError != null) {
+            scrollState.animateScrollTo(0)
         }
     }
 
@@ -122,10 +130,16 @@ fun LaundryFormScreen(
                     .fillMaxWidth()
                     .widthIn(max = 720.dp)
                     .imePadding()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (uiState.editId != null && !uiState.bolehUbahExisting) {
+                    ErrorBannerCard(
+                        message = "Catatan laundry ini terkunci (dicatat staf lain atau melewati batas jam edit penjaga). Anda hanya dapat melihat isinya.",
+                    )
+                }
+
                 uiState.submitError?.let { err ->
                     ErrorBannerCard(message = err.summaryMessage())
                 }
@@ -152,6 +166,7 @@ fun LaundryFormScreen(
                             label = "Tanggal Laundry",
                             valueIso = uiState.tanggal,
                             onValueSelected = viewModel::setTanggal,
+                            maxDateIso = DateUtil.todayIso(),
                             isError = uiState.submitError?.firstFieldError("tanggal") != null,
                             supportingText = uiState.submitError?.firstFieldError("tanggal"),
                         )
@@ -217,11 +232,19 @@ fun LaundryFormScreen(
                                     )
                                 }
                                 preview.duplikat?.let { dup ->
-                                    OutlinedButton(
-                                        onClick = { onOpenExistingEdit(dup.id) },
-                                        border = BorderStroke(1.dp, ext.danger),
-                                    ) {
-                                        Text("Buka & Ubah Catatan yang Sudah Ada", color = ext.danger)
+                                    if (dup.bolehUbah) {
+                                        OutlinedButton(
+                                            onClick = { onOpenExistingEdit(dup.id) },
+                                            border = BorderStroke(1.dp, ext.danger),
+                                        ) {
+                                            Text("Buka & Ubah Catatan yang Sudah Ada", color = ext.danger)
+                                        }
+                                    } else {
+                                        Text(
+                                            text = "Catatan pada tanggal ini terkunci untuk akun Anda (dicatat staf lain atau lewat batas jam edit).",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = ext.danger,
+                                        )
                                     }
                                 }
                             }
@@ -492,10 +515,24 @@ fun LaundryFormScreen(
                     )
                 }
 
+                if (uiState.hasDuplikatBlock) {
+                    Text(
+                        text = preview?.galat ?: "Penghuni sudah memiliki catatan pada tanggal ini.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = ext.danger,
+                    )
+                } else if (uiState.submitError != null) {
+                    Text(
+                        text = uiState.submitError!!.summaryMessage(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = ext.danger,
+                    )
+                }
+
                 MaroonPrimaryButton(
                     text = if (uiState.editId != null) "Simpan Perubahan" else "Simpan Catatan Laundry",
                     loading = uiState.submitting,
-                    enabled = !uiState.hasDuplikatBlock,
+                    enabled = !uiState.hasDuplikatBlock && (uiState.editId == null || uiState.bolehUbahExisting),
                     onClick = viewModel::submit,
                     modifier = Modifier.fillMaxWidth(),
                 )

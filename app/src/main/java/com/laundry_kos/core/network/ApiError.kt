@@ -33,12 +33,15 @@ data class ApiError(
     val isPropertiBelumDipilih: Boolean
         get() = httpCode == 422 && code == "PROPERTI_BELUM_DIPILIH"
 
-    val isForbiddenBlocked: Boolean
+    val isAccountOrPropertyBlocked: Boolean
         get() = httpCode == 403 && code in setOf(
             "AKUN_NONAKTIF",
             "PROPERTI_TIDAK_AKTIF",
-            "AKSES_PROPERTI_DITOLAK",
+            "PROPERTI_TIDAK_TERIKAT",
         )
+
+    val isForbiddenBlocked: Boolean
+        get() = isAccountOrPropertyBlocked || (httpCode == 403 && code == "AKSES_PROPERTI_DITOLAK")
 
     fun firstFieldError(field: String): String? = fieldErrors[field]?.firstOrNull()
 

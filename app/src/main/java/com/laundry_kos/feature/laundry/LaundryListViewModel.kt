@@ -37,10 +37,12 @@ data class LaundryListUiState(
     val terhapusLoading: Boolean = false,
     val terhapusTampil: Int = 15,
     val terhapusData: TerhapusListResponseDto? = null,
+    val terhapusError: String? = null,
     // Dialog Tetapkan Pemilik
     val tetapkanTarget: LaundryDto? = null,
     val tetapkanPenghuniList: List<InfoKuotaPenghuniDto> = emptyList(),
     val tetapkanLoading: Boolean = false,
+    val tetapkanError: String? = null,
 )
 
 class LaundryListViewModel(
@@ -159,12 +161,12 @@ class LaundryListViewModel(
     }
 
     fun openTerhapusDialog() {
-        _state.update { it.copy(showTerhapusDialog = true, terhapusTampil = 15) }
+        _state.update { it.copy(showTerhapusDialog = true, terhapusTampil = 15, terhapusError = null) }
         loadTerhapus()
     }
 
     fun closeTerhapusDialog() {
-        _state.update { it.copy(showTerhapusDialog = false) }
+        _state.update { it.copy(showTerhapusDialog = false, terhapusError = null) }
     }
 
     fun loadMoreTerhapus() {
@@ -175,13 +177,13 @@ class LaundryListViewModel(
 
     private fun loadTerhapus() {
         viewModelScope.launch {
-            _state.update { it.copy(terhapusLoading = true) }
+            _state.update { it.copy(terhapusLoading = true, terhapusError = null) }
             when (val res = repository.fetchLaundryTerhapus(_state.value.terhapusTampil)) {
                 is ApiResult.Success -> _state.update {
                     it.copy(terhapusLoading = false, terhapusData = res.data)
                 }
                 is ApiResult.Failure -> _state.update {
-                    it.copy(terhapusLoading = false, snackbarMessage = res.error.summaryMessage())
+                    it.copy(terhapusLoading = false, terhapusError = res.error.summaryMessage())
                 }
             }
         }
@@ -189,15 +191,15 @@ class LaundryListViewModel(
 
     fun pulihkan(id: Int) {
         viewModelScope.launch {
-            _state.update { it.copy(terhapusLoading = true) }
+            _state.update { it.copy(terhapusLoading = true, terhapusError = null) }
             when (val res = repository.pulihkanLaundry(id)) {
                 is ApiResult.Success -> {
-                    _state.update { it.copy(snackbarMessage = res.data.message) }
+                    _state.update { it.copy(snackbarMessage = res.data.message, terhapusError = null) }
                     loadTerhapus()
                     load(isRefresh = true)
                 }
                 is ApiResult.Failure -> _state.update {
-                    it.copy(terhapusLoading = false, snackbarMessage = res.error.summaryMessage())
+                    it.copy(terhapusLoading = false, terhapusError = res.error.summaryMessage())
                 }
             }
         }
@@ -205,39 +207,47 @@ class LaundryListViewModel(
 
     fun openTetapkanPemilik(laundry: LaundryDto) {
         viewModelScope.launch {
-            _state.update { it.copy(tetapkanTarget = laundry, tetapkanLoading = true, tetapkanPenghuniList = emptyList()) }
+            _state.update {
+                it.copy(
+                    tetapkanTarget = laundry,
+                    tetapkanLoading = true,
+                    tetapkanPenghuniList = emptyList(),
+                    tetapkanError = null,
+                )
+            }
             when (val res = repository.fetchInfoKuota(tanggal = laundry.tanggal)) {
                 is ApiResult.Success -> _state.update {
                     it.copy(tetapkanLoading = false, tetapkanPenghuniList = res.data.daftarPenghuni)
                 }
                 is ApiResult.Failure -> _state.update {
-                    it.copy(tetapkanLoading = false, snackbarMessage = res.error.summaryMessage())
+                    it.copy(tetapkanLoading = false, tetapkanError = res.error.summaryMessage())
                 }
             }
         }
     }
 
     fun dismissTetapkanPemilik() {
-        _state.update { it.copy(tetapkanTarget = null) }
+        _state.update { it.copy(tetapkanTarget = null, tetapkanError = null) }
     }
 
     fun confirmTetapkanPemilik(penghuniId: Int) {
         val target = _state.value.tetapkanTarget ?: return
         viewModelScope.launch {
-            _state.update { it.copy(tetapkanLoading = true) }
+            _state.update { it.copy(tetapkanLoading = true, tetapkanError = null) }
             when (val res = repository.tetapkanPemilik(target.id, penghuniId)) {
                 is ApiResult.Success -> {
                     _state.update {
                         it.copy(
                             tetapkanTarget = null,
                             tetapkanLoading = false,
+                            tetapkanError = null,
                             snackbarMessage = res.data.message,
                         )
                     }
                     load(isRefresh = true)
                 }
                 is ApiResult.Failure -> _state.update {
-                    it.copy(tetapkanLoading = false, snackbarMessage = res.error.summaryMessage())
+                    it.copy(tetapkanLoading = false, tetapkanError = res.error.summaryMessage())
                 }
             }
         }

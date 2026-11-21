@@ -30,6 +30,7 @@ data class LaundryItemDraft(
 
 data class LaundryFormUiState(
     val editId: Int? = null,
+    val bolehUbahExisting: Boolean = true,
     val loadingInitial: Boolean = false,
     val jenis: String = "penghuni",
     val tanggal: String = DateUtil.todayIso(),
@@ -98,6 +99,7 @@ class LaundryFormViewModel(
                     _state.update {
                         it.copy(
                             loadingInitial = false,
+                            bolehUbahExisting = d.bolehUbah,
                             jenis = d.jenis,
                             tanggal = d.tanggal,
                             selectedPenghuniId = d.penghuniId,
@@ -276,6 +278,45 @@ class LaundryFormViewModel(
         val s = _state.value
         if (s.submitting) return
 
+        if (s.editId != null && !s.bolehUbahExisting) {
+            _state.update {
+                it.copy(
+                    submitError = ApiError(
+                        httpCode = 403,
+                        message = "Catatan laundry ini terkunci (dicatat staf lain atau melewati batas jam edit penjaga).",
+                    ),
+                )
+            }
+            return
+        }
+
+        if (s.jenis == "penghuni" && s.selectedPenghuniId == null) {
+            _state.update {
+                it.copy(
+                    submitError = ApiError(
+                        httpCode = 422,
+                        message = "Penghuni belum dipilih untuk catatan laundry penghuni.",
+                        fieldErrors = mapOf("penghuni_id" to listOf("Penghuni belum dipilih untuk catatan laundry penghuni.")),
+                    ),
+                )
+            }
+            return
+        }
+
+        if (s.hasDuplikatBlock) {
+            val msg = s.preview?.galat ?: "Penghuni sudah memiliki catatan laundry pada tanggal ini."
+            _state.update {
+                it.copy(
+                    submitError = ApiError(
+                        httpCode = 422,
+                        message = msg,
+                        fieldErrors = mapOf("tanggal" to listOf(msg)),
+                    ),
+                )
+            }
+            return
+        }
+
         val itemDtos = s.items.mapNotNull { draft ->
             if (draft.nama.isBlank() && draft.biaya.isBlank() && draft.beratKg.isBlank()) {
                 null
@@ -289,12 +330,27 @@ class LaundryFormViewModel(
             }
         }
 
+        val beratNorm = s.beratKg.replace(',', '.').trim().takeIf { it.isNotEmpty() }
+        if (beratNorm == null && itemDtos.isEmpty()) {
+            val msg = "Isi berat cucian utama atau tambahkan minimal satu item terpisah."
+            _state.update {
+                it.copy(
+                    submitError = ApiError(
+                        httpCode = 422,
+                        message = msg,
+                        fieldErrors = mapOf("berat_kg" to listOf(msg)),
+                    ),
+                )
+            }
+            return
+        }
+
         val request = SimpanLaundryRequestDto(
             jenis = s.jenis,
             tanggal = s.tanggal,
             penghuniId = if (s.jenis == "penghuni") s.selectedPenghuniId else null,
             namaTanpaNama = if (s.jenis == "tanpa_nama") s.namaTanpaNama.trim().takeIf { it.isNotEmpty() } else null,
-            beratKg = s.beratKg.replace(',', '.').trim().takeIf { it.isNotEmpty() },
+            beratKg = beratNorm,
             biayaUtama = s.biayaUtamaInput.toIntOrNull(),
             konfirmasiBeratBesar = s.konfirmasiBeratBesar,
             catatan = s.catatan.trim().takeIf { it.isNotEmpty() },

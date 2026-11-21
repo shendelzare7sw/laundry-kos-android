@@ -193,6 +193,7 @@ private fun OwnerGedungNavHost(
                 onUbahProperti = sessionViewModel::ubahProperti,
                 onOpenSetup = { propId -> navController.navigate("gedung/setup/$propId") },
                 onOpenPengguna = { navController.navigate("gedung/pengguna") },
+                onClearDialogError = sessionViewModel::clearPropertiDialogError,
                 onClearSnackbar = sessionViewModel::clearSelectPropertiSnackbar,
                 onLogout = sessionViewModel::logout,
             )
@@ -724,11 +725,21 @@ private fun AuthenticatedAppShell(
                         )
                     }
 
-                    composable(OperasionalTab.PENGHUNI.route) {
+                    composable(OperasionalTab.PENGHUNI.route) { entry ->
                         val vm: PenghuniListViewModel = viewModel(
                             key = "penghuni_${authState.propertiAktif.id}",
                             factory = PenghuniListViewModel.Factory(repository),
                         )
+                        val needsRefresh by entry.savedStateHandle
+                            .getStateFlow("refresh_data", false)
+                            .collectAsStateWithLifecycle()
+                        LaunchedEffect(needsRefresh) {
+                            if (needsRefresh) {
+                                vm.load(isRefresh = true)
+                                notifikasiViewModel.refresh()
+                                entry.savedStateHandle["refresh_data"] = false
+                            }
+                        }
                         PenghuniListScreen(
                             viewModel = vm,
                             onOpenDetail = { id -> navController.navigate("penghuni/detail/$id") },
@@ -840,6 +851,9 @@ private fun AuthenticatedAppShell(
                             viewModel = vm,
                             onBack = { navController.popBackStack() },
                             onEditLaundry = { laundryId -> navController.navigate("laundry/edit/$laundryId") },
+                            onMutated = {
+                                navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
+                            },
                         )
                     }
                 }

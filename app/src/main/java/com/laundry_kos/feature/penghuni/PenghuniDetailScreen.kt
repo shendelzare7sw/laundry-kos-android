@@ -96,6 +96,7 @@ fun PenghuniDetailScreen(
     viewModel: PenghuniDetailViewModel,
     onBack: () -> Unit,
     onEditLaundry: (Int) -> Unit,
+    onMutated: () -> Unit = {},
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val ext = LaundryKosTheme.extendedColors
@@ -113,6 +114,12 @@ fun PenghuniDetailScreen(
         uiState.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearSnackbar()
+        }
+    }
+
+    LaunchedEffect(uiState.hasMutated) {
+        if (uiState.hasMutated) {
+            onMutated()
         }
     }
 
@@ -280,17 +287,33 @@ fun PenghuniDetailScreen(
                             // Tombol Aksi Kontrak & Nomor (grid rapi 2 kolom portrait / 4 kolom landscape)
                             val actionItems = buildList {
                                 if (perms.bolehKelolaPenghuni) {
-                                    add(PenghuniActionItem("Edit", Icons.Default.Edit) { showEditDialog = true })
-                                    add(PenghuniActionItem("Ganti WA", Icons.Default.Phone) { showGantiNomorDialog = true })
+                                    add(
+                                        PenghuniActionItem("Edit", Icons.Default.Edit) {
+                                            viewModel.clearDialogError()
+                                            showEditDialog = true
+                                        },
+                                    )
+                                    add(
+                                        PenghuniActionItem("Ganti WA", Icons.Default.Phone) {
+                                            viewModel.clearDialogError()
+                                            showGantiNomorDialog = true
+                                        },
+                                    )
                                 }
                                 if (perms.bolehKelolaKontrak && p.status != "keluar") {
                                     add(
                                         PenghuniActionItem("Pindah Kamar", Icons.Default.SwapHoriz) {
+                                            viewModel.clearDialogError()
                                             viewModel.loadKamarKosong()
                                             showPindahDialog = true
                                         },
                                     )
-                                    add(PenghuniActionItem("Keluar", Icons.AutoMirrored.Filled.ExitToApp, isDanger = true) { showKeluarDialog = true })
+                                    add(
+                                        PenghuniActionItem("Keluar", Icons.AutoMirrored.Filled.ExitToApp, isDanger = true) {
+                                            viewModel.clearDialogError()
+                                            showKeluarDialog = true
+                                        },
+                                    )
                                 }
                                 if (perms.bisaBatalkanPindah) {
                                     add(PenghuniActionItem("Batal Pindah", Icons.AutoMirrored.Filled.Undo) { viewModel.batalkanPindah() })
@@ -360,7 +383,12 @@ fun PenghuniDetailScreen(
                             ) {
                                 Text("Kuota ${kuota.labelBulan}", style = MaterialTheme.typography.titleSmall)
                                 if (perms.bolehSesuaikanKuota) {
-                                    TextButton(onClick = { showSesuaikanKuotaDialog = true }) {
+                                    TextButton(
+                                        onClick = {
+                                            viewModel.clearDialogError()
+                                            showSesuaikanKuotaDialog = true
+                                        },
+                                    ) {
                                         Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text("Sesuaikan")
@@ -516,13 +544,21 @@ fun PenghuniDetailScreen(
             var jangka by remember { mutableStateOf(p.jangkaWaktuSewa) }
             var catatan by remember { mutableStateOf(p.catatan ?: "") }
             AlertDialog(
-                onDismissRequest = { showEditDialog = false },
+                onDismissRequest = {
+                    if (!uiState.actionLoading) {
+                        viewModel.clearDialogError()
+                        showEditDialog = false
+                    }
+                },
                 title = { Text("Edit Data Penghuni") },
                 text = {
                     Column(
                         modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        if (!uiState.dialogError.isNullOrBlank()) {
+                            ErrorBannerCard(message = uiState.dialogError!!)
+                        }
                         OutlinedTextField(value = nama, onValueChange = { nama = it }, label = { Text("Nama") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = alias, onValueChange = { alias = it }, label = { Text("Alias") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         if (detail.permissions.bolehKelolaKontrak) {
@@ -538,9 +574,8 @@ fun PenghuniDetailScreen(
                 },
                 confirmButton = {
                     TextButton(
-                        enabled = nama.isNotBlank(),
+                        enabled = !uiState.actionLoading && nama.isNotBlank(),
                         onClick = {
-                            showEditDialog = false
                             viewModel.ubahData(
                                 UbahPenghuniRequestDto(
                                     nama = nama.trim(),
@@ -550,36 +585,64 @@ fun PenghuniDetailScreen(
                                     jangkaWaktuSewa = jangka,
                                     catatan = catatan.trim().takeIf { it.isNotEmpty() },
                                 ),
-                            )
+                            ) { showEditDialog = false }
                         },
-                    ) { Text("Simpan") }
+                    ) { Text(if (uiState.actionLoading) "Menyimpan..." else "Simpan") }
                 },
-                dismissButton = { TextButton(onClick = { showEditDialog = false }) { Text("Batal") } },
+                dismissButton = {
+                    TextButton(
+                        enabled = !uiState.actionLoading,
+                        onClick = {
+                            viewModel.clearDialogError()
+                            showEditDialog = false
+                        },
+                    ) { Text("Batal") }
+                },
             )
         }
 
         if (showGantiNomorDialog) {
             var noWa by remember { mutableStateOf(p.noWa ?: "") }
             AlertDialog(
-                onDismissRequest = { showGantiNomorDialog = false },
+                onDismissRequest = {
+                    if (!uiState.actionLoading) {
+                        viewModel.clearDialogError()
+                        showGantiNomorDialog = false
+                    }
+                },
                 title = { Text("Ganti Nomor WhatsApp") },
                 text = {
-                    OutlinedTextField(
-                        value = noWa,
-                        onValueChange = { noWa = it },
-                        label = { Text("Nomor WhatsApp") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!uiState.dialogError.isNullOrBlank()) {
+                            ErrorBannerCard(message = uiState.dialogError!!)
+                        }
+                        OutlinedTextField(
+                            value = noWa,
+                            onValueChange = { noWa = it },
+                            label = { Text("Nomor WhatsApp") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        showGantiNomorDialog = false
-                        viewModel.gantiNomor(noWa.trim())
-                    }) { Text("Simpan") }
+                    TextButton(
+                        enabled = !uiState.actionLoading,
+                        onClick = {
+                            viewModel.gantiNomor(noWa.trim()) { showGantiNomorDialog = false }
+                        },
+                    ) { Text(if (uiState.actionLoading) "Menyimpan..." else "Simpan") }
                 },
-                dismissButton = { TextButton(onClick = { showGantiNomorDialog = false }) { Text("Batal") } },
+                dismissButton = {
+                    TextButton(
+                        enabled = !uiState.actionLoading,
+                        onClick = {
+                            viewModel.clearDialogError()
+                            showGantiNomorDialog = false
+                        },
+                    ) { Text("Batal") }
+                },
             )
         }
 
@@ -587,10 +650,18 @@ fun PenghuniDetailScreen(
             var selectedKamar by remember { mutableStateOf<KamarDto?>(null) }
             var tglPindah by remember { mutableStateOf(DateUtil.todayIso()) }
             AlertDialog(
-                onDismissRequest = { showPindahDialog = false },
+                onDismissRequest = {
+                    if (!uiState.actionLoading) {
+                        viewModel.clearDialogError()
+                        showPindahDialog = false
+                    }
+                },
                 title = { Text("Pindah Kamar") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!uiState.dialogError.isNullOrBlank()) {
+                            ErrorBannerCard(message = uiState.dialogError!!)
+                        }
                         Text("Kuota bulan berjalan tetap utuh setelah pindah kamar.", style = MaterialTheme.typography.bodySmall, color = ext.muted)
                         SearchableDropdownField(
                             label = "Kamar Tujuan Kosong *",
@@ -610,15 +681,22 @@ fun PenghuniDetailScreen(
                 },
                 confirmButton = {
                     TextButton(
-                        enabled = selectedKamar != null,
+                        enabled = !uiState.actionLoading && selectedKamar != null,
                         onClick = {
                             val tujuan = selectedKamar?.id ?: return@TextButton
-                            showPindahDialog = false
-                            viewModel.pindahKamar(tujuan, tglPindah)
+                            viewModel.pindahKamar(tujuan, tglPindah) { showPindahDialog = false }
                         },
-                    ) { Text("Pindahkan") }
+                    ) { Text(if (uiState.actionLoading) "Memindahkan..." else "Pindahkan") }
                 },
-                dismissButton = { TextButton(onClick = { showPindahDialog = false }) { Text("Batal") } },
+                dismissButton = {
+                    TextButton(
+                        enabled = !uiState.actionLoading,
+                        onClick = {
+                            viewModel.clearDialogError()
+                            showPindahDialog = false
+                        },
+                    ) { Text("Batal") }
+                },
             )
         }
 
@@ -626,21 +704,39 @@ fun PenghuniDetailScreen(
             var tglKeluar by remember { mutableStateOf(DateUtil.todayIso()) }
             var alasan by remember { mutableStateOf("") }
             AlertDialog(
-                onDismissRequest = { showKeluarDialog = false },
+                onDismissRequest = {
+                    if (!uiState.actionLoading) {
+                        viewModel.clearDialogError()
+                        showKeluarDialog = false
+                    }
+                },
                 title = { Text("Catat Penghuni Keluar") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!uiState.dialogError.isNullOrBlank()) {
+                            ErrorBannerCard(message = uiState.dialogError!!)
+                        }
                         DatePickerField(label = "Tanggal Keluar", valueIso = tglKeluar, onValueSelected = { tglKeluar = it })
                         OutlinedTextField(value = alasan, onValueChange = { alasan = it }, label = { Text("Alasan Keluar (opsional)") }, modifier = Modifier.fillMaxWidth())
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        showKeluarDialog = false
-                        viewModel.keluar(tglKeluar, alasan.trim())
-                    }) { Text("Catat Keluar", color = ext.danger) }
+                    TextButton(
+                        enabled = !uiState.actionLoading,
+                        onClick = {
+                            viewModel.keluar(tglKeluar, alasan.trim()) { showKeluarDialog = false }
+                        },
+                    ) { Text(if (uiState.actionLoading) "Menyimpan..." else "Catat Keluar", color = ext.danger) }
                 },
-                dismissButton = { TextButton(onClick = { showKeluarDialog = false }) { Text("Batal") } },
+                dismissButton = {
+                    TextButton(
+                        enabled = !uiState.actionLoading,
+                        onClick = {
+                            viewModel.clearDialogError()
+                            showKeluarDialog = false
+                        },
+                    ) { Text("Batal") }
+                },
             )
         }
 
@@ -649,10 +745,18 @@ fun PenghuniDetailScreen(
             var nominal by remember { mutableStateOf((kuota.nominalPenyesuaian ?: kuota.tagihanLewatKuota).toString()) }
             var catatan by remember { mutableStateOf(kuota.catatanPenyesuaian ?: "") }
             AlertDialog(
-                onDismissRequest = { showSesuaikanKuotaDialog = false },
+                onDismissRequest = {
+                    if (!uiState.actionLoading) {
+                        viewModel.clearDialogError()
+                        showSesuaikanKuotaDialog = false
+                    }
+                },
                 title = { Text("Sesuaikan Tagihan Lewat Kuota (${kuota.labelBulan})") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!uiState.dialogError.isNullOrBlank()) {
+                            ErrorBannerCard(message = uiState.dialogError!!)
+                        }
                         Text(
                             text = "Hitungan otomatis: ${Formatters.formatRupiah(kuota.tagihanOtomatis)}",
                             style = MaterialTheme.typography.bodySmall,
@@ -677,21 +781,34 @@ fun PenghuniDetailScreen(
                 confirmButton = {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (kuota.nominalPenyesuaian != null) {
-                            TextButton(onClick = {
-                                showSesuaikanKuotaDialog = false
-                                viewModel.simpanPenyesuaianKuota(null, reset = true, catatan = null)
-                            }) { Text("Reset Otomatis") }
+                            TextButton(
+                                enabled = !uiState.actionLoading,
+                                onClick = {
+                                    viewModel.simpanPenyesuaianKuota(null, reset = true, catatan = null) {
+                                        showSesuaikanKuotaDialog = false
+                                    }
+                                },
+                            ) { Text("Reset Otomatis") }
                         }
                         TextButton(
-                            enabled = nominal.toIntOrNull() != null,
+                            enabled = !uiState.actionLoading && nominal.toIntOrNull() != null,
                             onClick = {
-                                showSesuaikanKuotaDialog = false
-                                viewModel.simpanPenyesuaianKuota(nominal.toIntOrNull(), reset = false, catatan = catatan.trim())
+                                viewModel.simpanPenyesuaianKuota(nominal.toIntOrNull(), reset = false, catatan = catatan.trim()) {
+                                    showSesuaikanKuotaDialog = false
+                                }
                             },
-                        ) { Text("Simpan") }
+                        ) { Text(if (uiState.actionLoading) "Menyimpan..." else "Simpan") }
                     }
                 },
-                dismissButton = { TextButton(onClick = { showSesuaikanKuotaDialog = false }) { Text("Batal") } },
+                dismissButton = {
+                    TextButton(
+                        enabled = !uiState.actionLoading,
+                        onClick = {
+                            viewModel.clearDialogError()
+                            showSesuaikanKuotaDialog = false
+                        },
+                    ) { Text("Batal") }
+                },
             )
         }
     }

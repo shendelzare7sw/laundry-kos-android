@@ -106,7 +106,10 @@ fun PenggunaScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showTambahDialog = true },
+                onClick = {
+                    viewModel.clearDialogError()
+                    showTambahDialog = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White,
             ) {
@@ -147,7 +150,10 @@ fun PenggunaScreen(
                 } else if (data != null) {
                     items(data.data, key = { it.id }) { user ->
                         LaundryCard(
-                            modifier = Modifier.clickable(enabled = user.bolehUbah) { resetTarget = user },
+                            modifier = Modifier.clickable(enabled = user.bolehUbah) {
+                                viewModel.clearDialogError()
+                                resetTarget = user
+                            },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                         ) {
                             Row(
@@ -181,7 +187,10 @@ fun PenggunaScreen(
                                 if (user.bolehUbah) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
-                                            onClick = { resetTarget = user },
+                                            onClick = {
+                                                viewModel.clearDialogError()
+                                                resetTarget = user
+                                            },
                                             modifier = Modifier.size(36.dp),
                                         ) {
                                             Icon(
@@ -231,13 +240,21 @@ fun PenggunaScreen(
         var selectedPropertiId by remember { mutableStateOf(data.propertiPilihan.firstOrNull()?.id) }
 
         AlertDialog(
-            onDismissRequest = { if (!uiState.submitting) showTambahDialog = false },
+            onDismissRequest = {
+                if (!uiState.submitting) {
+                    viewModel.clearDialogError()
+                    showTambahDialog = false
+                }
+            },
             title = { Text("Tambah Akun Pengguna") },
             text = {
                 Column(
                     modifier = Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (!uiState.dialogError.isNullOrBlank()) {
+                        ErrorBannerCard(message = uiState.dialogError!!)
+                    }
                     OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap *") }, singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username (tanpa spasi) *") }, singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email (opsional)") }, singleLine = true, shape = RoundedCornerShape(12.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
@@ -287,7 +304,13 @@ fun PenggunaScreen(
                 ) { Text(if (uiState.submitting) "Menyimpan..." else "Buat Akun") }
             },
             dismissButton = {
-                TextButton(onClick = { showTambahDialog = false }, enabled = !uiState.submitting) { Text("Batal") }
+                TextButton(
+                    onClick = {
+                        viewModel.clearDialogError()
+                        showTambahDialog = false
+                    },
+                    enabled = !uiState.submitting,
+                ) { Text("Batal") }
             },
         )
     }
@@ -322,10 +345,18 @@ fun PenggunaScreen(
         var pass by remember { mutableStateOf("") }
         var confirm by remember { mutableStateOf("") }
         AlertDialog(
-            onDismissRequest = { resetTarget = null },
+            onDismissRequest = {
+                if (!uiState.submitting) {
+                    viewModel.clearDialogError()
+                    resetTarget = null
+                }
+            },
             title = { Text("Reset Password @${target.username}") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!uiState.dialogError.isNullOrBlank()) {
+                        ErrorBannerCard(message = uiState.dialogError!!)
+                    }
                     OutlinedTextField(value = pass, onValueChange = { pass = it }, label = { Text("Password Baru (min 8)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = confirm, onValueChange = { confirm = it }, label = { Text("Konfirmasi Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
                 }
@@ -339,9 +370,17 @@ fun PenggunaScreen(
                             resetTarget = null
                         }
                     },
-                ) { Text("Simpan") }
+                ) { Text(if (uiState.submitting) "Menyimpan..." else "Simpan") }
             },
-            dismissButton = { TextButton(onClick = { resetTarget = null }) { Text("Batal") } },
+            dismissButton = {
+                TextButton(
+                    enabled = !uiState.submitting,
+                    onClick = {
+                        viewModel.clearDialogError()
+                        resetTarget = null
+                    },
+                ) { Text("Batal") }
+            },
         )
     }
 }

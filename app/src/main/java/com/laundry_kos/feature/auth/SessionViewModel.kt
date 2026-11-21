@@ -21,7 +21,9 @@ sealed interface SessionUiState {
     data object Checking : SessionUiState
 
     data class Unauthenticated(
+        val bannerTitle: String? = null,
         val bannerMessage: String? = null,
+        val bannerIsError: Boolean = true,
         val isLoggingIn: Boolean = false,
         val loginError: ApiError? = null,
     ) : SessionUiState
@@ -30,6 +32,7 @@ sealed interface SessionUiState {
         val user: UserDto,
         val propertiList: List<PropertiDto>,
         val message: String? = null,
+        val dialogError: String? = null,
         val snackbarMessage: String? = null,
         val isSubmitting: Boolean = false,
         val isRefreshing: Boolean = false,
@@ -60,13 +63,32 @@ class SessionViewModel(
     private fun isGlobalRole(user: UserDto): Boolean =
         user.role == "owner" || user.role == "dev_admin"
 
+    private fun titleForBlockedCode(code: String?): String = when (code) {
+        "AKUN_NONAKTIF" -> "Akun Dinonaktifkan"
+        "PROPERTI_TIDAK_AKTIF", "PROPERTI_TIDAK_TERIKAT" -> "Properti Tidak Aktif"
+        "UNAUTHORIZED" -> "Sesi Login Berakhir"
+        else -> "Akses Ditolak"
+    }
+
     private fun observeGlobalEvents() {
         viewModelScope.launch {
             repository.eventBus.events.collect { event ->
                 when (event) {
+                    is GlobalApiEvent.SessionRevoked -> {
+                        repository.sessionStore.clearSession()
+                        _state.value = SessionUiState.Unauthenticated(
+                            bannerTitle = titleForBlockedCode(event.code),
+                            bannerMessage = event.message,
+                            bannerIsError = true,
+                        )
+                    }
                     is GlobalApiEvent.Unauthorized -> {
                         repository.sessionStore.clearSession()
-                        _state.value = SessionUiState.Unauthenticated(bannerMessage = event.message)
+                        _state.value = SessionUiState.Unauthenticated(
+                            bannerTitle = "Sesi Login Berakhir",
+                            bannerMessage = event.message,
+                            bannerIsError = true,
+                        )
                     }
                     is GlobalApiEvent.PropertiRequired -> {
                         val currentUser = when (val s = _state.value) {
@@ -121,7 +143,15 @@ class SessionViewModel(
                     if (res.error.isUnauthorized || res.error.isForbiddenBlocked) {
                         repository.sessionStore.clearSession()
                     }
-                    _state.value = SessionUiState.Unauthenticated(bannerMessage = res.error.message)
+                    _state.value = SessionUiState.Unauthenticated(
+                        bannerTitle = if (res.error.isAccountOrPropertyBlocked || res.error.isUnauthorized) {
+                            titleForBlockedCode(res.error.code ?: if (res.error.isUnauthorized) "UNAUTHORIZED" else null)
+                        } else {
+                            null
+                        },
+                        bannerMessage = res.error.message,
+                        bannerIsError = true,
+                    )
                 }
             }
         }
@@ -185,6 +215,12 @@ class SessionViewModel(
         }
     }
 
+    fun clearPropertiDialogError() {
+        _state.update { s ->
+            if (s is SessionUiState.SelectProperti) s.copy(dialogError = null) else s
+        }
+    }
+
     fun tambahProperti(
         request: SimpanPropertiRequestDto,
         onCreated: (PropertiDto) -> Unit,
@@ -192,13 +228,13 @@ class SessionViewModel(
         if (_state.value !is SessionUiState.SelectProperti) return
         viewModelScope.launch {
             _state.update { s ->
-                if (s is SessionUiState.SelectProperti) s.copy(isSubmitting = true, message = null) else s
+                if (s is SessionUiState.SelectProperti) s.copy(isSubmitting = true, message = null, dialogError = null) else s
             }
             when (val res = repository.tambahProperti(request)) {
                 is ApiResult.Success -> {
                     _state.update { s ->
                         if (s is SessionUiState.SelectProperti) {
-                            s.copy(isSubmitting = false, snackbarMessage = res.data.message)
+                            s.copy(isSubmitting = false, dialogError = null, snackbarMessage = res.data.message)
                         } else {
                             s
                         }
@@ -208,7 +244,7 @@ class SessionViewModel(
                 }
                 is ApiResult.Failure -> _state.update { s ->
                     if (s is SessionUiState.SelectProperti) {
-                        s.copy(isSubmitting = false, snackbarMessage = res.error.summaryMessage())
+                        s.copy(isSubmitting = false, dialogError = res.error.summaryMessage())
                     } else {
                         s
                     }
@@ -225,13 +261,13 @@ class SessionViewModel(
         if (_state.value !is SessionUiState.SelectProperti) return
         viewModelScope.launch {
             _state.update { s ->
-                if (s is SessionUiState.SelectProperti) s.copy(isSubmitting = true, message = null) else s
+                if (s is SessionUiState.SelectProperti) s.copy(isSubmitting = true, message = null, dialogError = null) else s
             }
             when (val res = repository.ubahProperti(propertiId, request)) {
                 is ApiResult.Success -> {
                     _state.update { s ->
                         if (s is SessionUiState.SelectProperti) {
-                            s.copy(isSubmitting = false, snackbarMessage = res.data.message)
+                            s.copy(isSubmitting = false, dialogError = null, snackbarMessage = res.data.message)
                         } else {
                             s
                         }
@@ -241,7 +277,7 @@ class SessionViewModel(
                 }
                 is ApiResult.Failure -> _state.update { s ->
                     if (s is SessionUiState.SelectProperti) {
-                        s.copy(isSubmitting = false, snackbarMessage = res.error.summaryMessage())
+                        s.copy(isSubmitting = false, dialogError = res.error.summaryMessage())
                     } else {
                         s
                     }
@@ -271,7 +307,7 @@ class SessionViewModel(
                     permissions = res.data.permissions,
                 )
                 is ApiResult.Failure -> {
-                    if (current is SessionUiState.SelectProperti) {
+                    if (current is SessionUiState.SelectProperti && !res.error.isAccountOrPropertyBlocked && !res.error.isUnauthorized) {
                         _state.value = current.copy(isSubmitting = false, message = res.error.message)
                     }
                 }
@@ -305,7 +341,10 @@ class SessionViewModel(
     fun logout() {
         viewModelScope.launch {
             repository.logout()
-            _state.value = SessionUiState.Unauthenticated(bannerMessage = "Anda telah keluar dari akun.")
+            _state.value = SessionUiState.Unauthenticated(
+                bannerMessage = "Anda telah keluar dari akun.",
+                bannerIsError = false,
+            )
         }
     }
 

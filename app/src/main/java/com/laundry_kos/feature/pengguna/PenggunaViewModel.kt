@@ -20,6 +20,7 @@ data class PenggunaUiState(
     val submitting: Boolean = false,
     val data: PenggunaListResponseDto? = null,
     val error: String? = null,
+    val dialogError: String? = null,
     val snackbarMessage: String? = null,
 )
 
@@ -54,17 +55,21 @@ class PenggunaViewModel(
         }
     }
 
+    fun clearDialogError() {
+        _state.update { it.copy(dialogError = null) }
+    }
+
     fun tambahPengguna(request: SimpanPenggunaRequestDto, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _state.update { it.copy(submitting = true) }
+            _state.update { it.copy(submitting = true, dialogError = null) }
             when (val res = repository.tambahPengguna(request)) {
                 is ApiResult.Success -> {
-                    _state.update { it.copy(submitting = false, snackbarMessage = res.data.message) }
+                    _state.update { it.copy(submitting = false, dialogError = null, snackbarMessage = res.data.message) }
                     onSuccess()
                     load(isRefresh = true)
                 }
                 is ApiResult.Failure -> _state.update {
-                    it.copy(submitting = false, snackbarMessage = res.error.summaryMessage())
+                    it.copy(submitting = false, dialogError = res.error.summaryMessage())
                 }
             }
         }
@@ -87,14 +92,14 @@ class PenggunaViewModel(
 
     fun resetPassword(userId: Int, password: String, confirmation: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _state.update { it.copy(submitting = true) }
+            _state.update { it.copy(submitting = true, dialogError = null) }
             when (val res = repository.resetPasswordPengguna(userId, ResetPasswordRequestDto(password, confirmation))) {
                 is ApiResult.Success -> {
-                    _state.update { it.copy(submitting = false, snackbarMessage = res.data.message) }
+                    _state.update { it.copy(submitting = false, dialogError = null, snackbarMessage = res.data.message) }
                     onSuccess()
                 }
                 is ApiResult.Failure -> _state.update {
-                    it.copy(submitting = false, snackbarMessage = res.error.summaryMessage())
+                    it.copy(submitting = false, dialogError = res.error.summaryMessage())
                 }
             }
         }

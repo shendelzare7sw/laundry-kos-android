@@ -2,9 +2,11 @@ package com.laundry_kos.core.network
 
 import com.laundry_kos.core.util.LaporanPdfPrinter
 import com.laundry_kos.data.dto.AuthResponseDto
+import com.laundry_kos.data.dto.InfoKuotaResponseDto
 import com.laundry_kos.data.dto.LaporanResponse
 import com.laundry_kos.data.dto.LaundryListResponseDto
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,6 +46,68 @@ class ApiSerializationAndErrorTest {
         val err = ApiErrorParser.parseBody(422, body)
         assertEquals("Budi sudah memiliki catatan laundry pada 21/11/2026.", err.firstFieldError("tanggal"))
         assertEquals("Budi sudah memiliki catatan laundry pada 21/11/2026.", err.summaryMessage())
+    }
+
+    @Test
+    fun parseError_handlesAccountAndPropertyBlocked403() {
+        val akunNonaktif = ApiErrorParser.parseBody(
+            403,
+            """{"message":"Akun Penjaga Anda sedang dinonaktifkan oleh Admin/Owner.","code":"AKUN_NONAKTIF"}""",
+        )
+        assertTrue(akunNonaktif.isAccountOrPropertyBlocked)
+        assertTrue(akunNonaktif.isForbiddenBlocked)
+        assertEquals("AKUN_NONAKTIF", akunNonaktif.code)
+
+        val propNonaktif = ApiErrorParser.parseBody(
+            403,
+            """{"message":"Properti penempatan Anda sedang tidak aktif.","code":"PROPERTI_TIDAK_AKTIF"}""",
+        )
+        assertTrue(propNonaktif.isAccountOrPropertyBlocked)
+
+        val forbiddenBiasa = ApiErrorParser.parseBody(
+            403,
+            """{"message":"Anda tidak memiliki izin untuk melakukan tindakan ini.","code":"FORBIDDEN"}""",
+        )
+        assertFalse(forbiddenBiasa.isAccountOrPropertyBlocked)
+    }
+
+    @Test
+    fun deserialize_duplikatBolehUbahAndNamaTanpaNama() {
+        val json = NetworkModule.json
+        val infoJson = """
+            {
+              "tarif_per_kg": 8000,
+              "min_kg": "2",
+              "min_kg_centi": 200,
+              "galat": "Glenn sudah memiliki catatan laundry pada 21/11/2026.",
+              "duplikat": {"id": 42, "url_ubah": null, "boleh_ubah": false},
+              "daftar_penghuni": []
+            }
+        """.trimIndent()
+        val info = json.decodeFromString<InfoKuotaResponseDto>(infoJson)
+        assertEquals(42, info.duplikat?.id)
+        assertFalse(info.duplikat?.bolehUbah ?: true)
+
+        val tanpaNamaJson = """
+            {
+              "rentang": {"periode": "bulan_ini", "label": "November 2026"},
+              "ringkasan": {},
+              "meta": {},
+              "data": [
+                {
+                  "id": 77,
+                  "tanggal": "2026-11-21",
+                  "jenis": "tanpa_nama",
+                  "jenis_label": "Tanpa nama",
+                  "nama_tanpa_nama": "Tas merah",
+                  "berat_centi": 250,
+                  "berat_label": "2,5"
+                }
+              ]
+            }
+        """.trimIndent()
+        val list = json.decodeFromString<LaundryListResponseDto>(tanpaNamaJson)
+        assertEquals("Tas merah", list.data.first().namaTanpaNama)
     }
 
     @Test

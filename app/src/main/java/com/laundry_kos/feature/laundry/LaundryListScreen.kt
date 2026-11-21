@@ -492,62 +492,70 @@ fun LaundryListScreen(
             title = { Text("Catatan Laundry Terhapus") },
             text = {
                 val terhapus = uiState.terhapusData
-                if (uiState.terhapusLoading && terhapus == null) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!uiState.terhapusError.isNullOrBlank()) {
+                        ErrorBannerCard(message = uiState.terhapusError!!)
                     }
-                } else if (terhapus == null || terhapus.data.isEmpty()) {
-                    Text("Tidak ada catatan terhapus.")
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 360.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(terhapus.data, key = { it.id }) { row ->
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = ext.surfaceAlt,
-                                border = BorderStroke(1.dp, ext.line),
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
+                    if (uiState.terhapusLoading && terhapus == null) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else if (terhapus == null || terhapus.data.isEmpty()) {
+                        Text("Tidak ada catatan terhapus.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 340.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(terhapus.data, key = { it.id }) { row ->
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = ext.surfaceAlt,
+                                    border = BorderStroke(1.dp, ext.line),
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        val rowTitle = row.penghuniNama
-                                            ?: row.namaTanpaNama?.takeIf { it.isNotBlank() }?.let { "Tanpa Nama · $it" }
-                                            ?: row.jenisLabel
-                                        Text(
-                                            text = rowTitle,
-                                            style = MaterialTheme.typography.titleSmall,
-                                        )
-                                        Text(
-                                            text = "${DateUtil.formatIsoDateLabel(row.tanggal)} · ${Formatters.formatBeratKg(row.beratCenti, row.beratLabel)}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = ext.muted,
-                                        )
-                                    }
-                                    TextButton(onClick = { viewModel.pulihkan(row.id) }) {
-                                        Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Pulihkan")
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            val rowTitle = row.penghuniNama
+                                                ?: row.namaTanpaNama?.takeIf { it.isNotBlank() }?.let { "Tanpa Nama · $it" }
+                                                ?: row.jenisLabel
+                                            Text(
+                                                text = rowTitle,
+                                                style = MaterialTheme.typography.titleSmall,
+                                            )
+                                            Text(
+                                                text = "${DateUtil.formatIsoDateLabel(row.tanggal)} · ${Formatters.formatBeratKg(row.beratCenti, row.beratLabel)}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = ext.muted,
+                                            )
+                                        }
+                                        TextButton(
+                                            enabled = !uiState.terhapusLoading,
+                                            onClick = { viewModel.pulihkan(row.id) },
+                                        ) {
+                                            Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Pulihkan")
+                                        }
                                     }
                                 }
                             }
-                        }
-                        if (terhapus.meta.adaLagi) {
-                            item {
-                                LoadMoreButton(
-                                    ditampilkan = terhapus.meta.ditampilkan,
-                                    total = terhapus.meta.total,
-                                    loading = uiState.terhapusLoading,
-                                    onClick = viewModel::loadMoreTerhapus,
-                                )
+                            if (terhapus.meta.adaLagi) {
+                                item {
+                                    LoadMoreButton(
+                                        ditampilkan = terhapus.meta.ditampilkan,
+                                        total = terhapus.meta.total,
+                                        loading = uiState.terhapusLoading,
+                                        onClick = viewModel::loadMoreTerhapus,
+                                    )
+                                }
                             }
                         }
                     }
@@ -569,6 +577,9 @@ fun LaundryListScreen(
             title = { Text("Tetapkan Pemilik") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!uiState.tetapkanError.isNullOrBlank()) {
+                        ErrorBannerCard(message = uiState.tetapkanError!!)
+                    }
                     val info = buildString {
                         append(DateUtil.formatIsoDateLabel(target.tanggal))
                         target.namaTanpaNama?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
@@ -596,12 +607,12 @@ fun LaundryListScreen(
             },
             confirmButton = {
                 TextButton(
-                    enabled = selectedPenghuni != null,
+                    enabled = !uiState.tetapkanLoading && selectedPenghuni != null,
                     onClick = {
                         selectedPenghuni?.let { viewModel.confirmTetapkanPemilik(it.id) }
                     },
                 ) {
-                    Text("Tetapkan")
+                    Text(if (uiState.tetapkanLoading) "Menyimpan..." else "Tetapkan")
                 }
             },
             dismissButton = {
