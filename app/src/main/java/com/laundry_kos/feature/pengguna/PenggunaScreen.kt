@@ -22,21 +22,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
@@ -64,6 +59,7 @@ import com.laundry_kos.core.designsystem.ErrorBannerCard
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LaundrySnackbarHost
+import com.laundry_kos.core.designsystem.SearchableDropdownField
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.data.dto.PenggunaItemDto
 import com.laundry_kos.data.dto.SimpanPenggunaRequestDto
@@ -88,10 +84,10 @@ fun PenggunaScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
             TopAppBar(
                 title = {
                     Text(
@@ -214,6 +210,14 @@ fun PenggunaScreen(
                 }
             }
         }
+        }
+
+        LaundrySnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
+        )
     }
 
     // Dialog Tambah Akun
@@ -225,7 +229,6 @@ fun PenggunaScreen(
         var password by remember { mutableStateOf("") }
         var role by remember { mutableStateOf(data.peranDiizinkan.firstOrNull()?.value ?: "penjaga") }
         var selectedPropertiId by remember { mutableStateOf(data.propertiPilihan.firstOrNull()?.id) }
-        var propertiExpanded by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { if (!uiState.submitting) showTambahDialog = false },
@@ -235,10 +238,10 @@ fun PenggunaScreen(
                     modifier = Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username (tanpa spasi) *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email (opsional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password Awal (min 8) *") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama Lengkap *") }, singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username (tanpa spasi) *") }, singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email (opsional)") }, singleLine = true, shape = RoundedCornerShape(12.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password Awal (min 8) *") }, singleLine = true, shape = RoundedCornerShape(12.dp), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         data.peranDiizinkan.forEach { opt ->
@@ -251,29 +254,16 @@ fun PenggunaScreen(
                     }
 
                     if ((role == "admin" || role == "penjaga") && data.propertiPilihan.isNotEmpty()) {
-                        val selectedName = data.propertiPilihan.firstOrNull { it.id == selectedPropertiId }?.nama ?: ""
-                        Box {
-                            OutlinedTextField(
-                                value = selectedName,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Properti Penempatan") },
-                                trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Box(modifier = Modifier.matchParentSize().clickable { propertiExpanded = true })
-                            DropdownMenu(expanded = propertiExpanded, onDismissRequest = { propertiExpanded = false }) {
-                                data.propertiPilihan.forEach { prop ->
-                                    DropdownMenuItem(
-                                        text = { Text(prop.nama) },
-                                        onClick = {
-                                            selectedPropertiId = prop.id
-                                            propertiExpanded = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
+                        val selectedProp = data.propertiPilihan.firstOrNull { it.id == selectedPropertiId }
+                        SearchableDropdownField(
+                            label = "Properti Penempatan",
+                            items = data.propertiPilihan,
+                            selectedItem = selectedProp,
+                            itemLabel = { it.nama },
+                            onSelect = { selectedPropertiId = it?.id },
+                            placeholder = "Ketik nama properti...",
+                            emptyText = "Properti tidak ditemukan.",
+                        )
                     }
                 }
             },

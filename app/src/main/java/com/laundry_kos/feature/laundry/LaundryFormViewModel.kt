@@ -35,6 +35,7 @@ data class LaundryFormUiState(
     val tanggal: String = DateUtil.todayIso(),
     val selectedPenghuniId: Int? = null,
     val selectedPenghuniLabel: String = "",
+    val namaTanpaNama: String = "",
     val beratKg: String = "",
     val biayaManualMode: Boolean = false,
     val biayaUtamaInput: String = "",
@@ -104,9 +105,10 @@ class LaundryFormViewModel(
                                 d.kamarNomor?.let { k -> append("Kamar $k · ") }
                                 append(d.penghuniNama ?: "")
                             },
+                            namaTanpaNama = d.namaTanpaNama ?: "",
                             beratKg = d.beratLabel?.replace(',', '.') ?: "",
                             biayaManualMode = d.biayaManual,
-                            biayaUtamaInput = if (d.biayaManual) (d.biayaUtama?.toString() ?: "") else "",
+                            biayaUtamaInput = d.biayaUtama?.toString() ?: "",
                             catatan = d.catatan ?: "",
                             items = d.item.map { sub ->
                                 LaundryItemDraft(
@@ -142,7 +144,18 @@ class LaundryFormViewModel(
         refreshInfoKuota(immediate = true)
     }
 
-    fun selectPenghuni(penghuni: InfoKuotaPenghuniDto) {
+    fun selectPenghuni(penghuni: InfoKuotaPenghuniDto?) {
+        if (penghuni == null) {
+            _state.update {
+                it.copy(
+                    selectedPenghuniId = null,
+                    selectedPenghuniLabel = "",
+                    preview = it.preview?.copy(kuota = null, galat = null, duplikat = null),
+                    submitError = null,
+                )
+            }
+            return
+        }
         _state.update {
             it.copy(
                 selectedPenghuniId = penghuni.id,
@@ -153,32 +166,44 @@ class LaundryFormViewModel(
         refreshInfoKuota(immediate = true)
     }
 
+    fun setNamaTanpaNama(value: String) {
+        _state.update { it.copy(namaTanpaNama = value.take(120), submitError = null) }
+    }
+
     fun setBeratKg(value: String) {
         val filtered = value.filter { it.isDigit() || it == '.' || it == ',' }
-        _state.update { it.copy(beratKg = filtered, submitError = null) }
+        _state.update {
+            it.copy(
+                beratKg = filtered,
+                biayaUtamaInput = if (filtered.isBlank() && !it.biayaManualMode) "" else it.biayaUtamaInput,
+                submitError = null,
+            )
+        }
         refreshInfoKuota(immediate = false)
     }
 
-    fun setBiayaManualMode(manual: Boolean) {
-        _state.update {
-            val defaultManual = if (manual && it.biayaUtamaInput.isBlank()) {
-                it.preview?.biayaOtomatis?.toString() ?: ""
+    fun setBiayaUtamaInput(value: String) {
+        val digits = value.filter(Char::isDigit)
+        _state.update { cur ->
+            val autoVal = cur.preview?.biayaOtomatis
+            val isManual = if (digits.isBlank()) {
+                false
             } else {
-                it.biayaUtamaInput
+                autoVal == null || digits.toIntOrNull() != autoVal
             }
-            it.copy(
-                biayaManualMode = manual,
-                biayaUtamaInput = if (manual) defaultManual else "",
+            cur.copy(
+                biayaManualMode = isManual,
+                biayaUtamaInput = digits,
                 submitError = null,
             )
         }
     }
 
-    fun setBiayaUtamaInput(value: String) {
-        _state.update {
-            it.copy(
-                biayaManualMode = true,
-                biayaUtamaInput = value.filter { c -> c.isDigit() },
+    fun kembalikanBiayaOtomatis() {
+        _state.update { cur ->
+            cur.copy(
+                biayaManualMode = false,
+                biayaUtamaInput = cur.preview?.biayaOtomatis?.toString() ?: "",
                 submitError = null,
             )
         }
@@ -212,7 +237,7 @@ class LaundryFormViewModel(
     private fun refreshInfoKuota(immediate: Boolean) {
         previewJob?.cancel()
         previewJob = viewModelScope.launch {
-            if (!immediate) delay(350)
+            if (!immediate) delay(200)
             val s = _state.value
             _state.update { it.copy(loadingPreview = true) }
             val normalizedBerat = s.beratKg.replace(',', '.').trim().takeIf { it.isNotEmpty() }
@@ -226,10 +251,17 @@ class LaundryFormViewModel(
                 is ApiResult.Success -> _state.update { cur ->
                     val list = res.data.daftarPenghuni
                     val selectedStillInList = list.firstOrNull { it.id == cur.selectedPenghuniId }
+                    val autoCost = res.data.biayaOtomatis
+                    val nextBiaya = when {
+                        cur.beratKg.isBlank() && !cur.biayaManualMode -> ""
+                        !cur.biayaManualMode || cur.biayaUtamaInput.isBlank() -> autoCost?.toString() ?: ""
+                        else -> cur.biayaUtamaInput
+                    }
                     cur.copy(
                         loadingPreview = false,
                         preview = res.data,
                         daftarPenghuni = list,
+                        biayaUtamaInput = nextBiaya,
                         selectedPenghuniLabel = selectedStillInList?.let {
                             it.label.ifBlank { "Kamar ${it.kamar} · ${it.nama}" }
                         } ?: cur.selectedPenghuniLabel,
@@ -261,8 +293,9 @@ class LaundryFormViewModel(
             jenis = s.jenis,
             tanggal = s.tanggal,
             penghuniId = if (s.jenis == "penghuni") s.selectedPenghuniId else null,
+            namaTanpaNama = if (s.jenis == "tanpa_nama") s.namaTanpaNama.trim().takeIf { it.isNotEmpty() } else null,
             beratKg = s.beratKg.replace(',', '.').trim().takeIf { it.isNotEmpty() },
-            biayaUtama = if (s.biayaManualMode) s.biayaUtamaInput.toIntOrNull() else null,
+            biayaUtama = s.biayaUtamaInput.toIntOrNull(),
             konfirmasiBeratBesar = s.konfirmasiBeratBesar,
             catatan = s.catatan.trim().takeIf { it.isNotEmpty() },
             ref = if (s.editId == null) s.idempotencyRef else null,

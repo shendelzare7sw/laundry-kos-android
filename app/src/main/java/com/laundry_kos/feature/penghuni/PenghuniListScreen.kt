@@ -1,7 +1,7 @@
 package com.laundry_kos.feature.penghuni
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,26 +16,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -47,8 +48,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.laundry_kos.core.designsystem.DatePickerField
 import com.laundry_kos.core.designsystem.EmptyStateCard
@@ -59,6 +65,8 @@ import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.MonthSelectorBar
+import com.laundry_kos.core.designsystem.SearchableDropdownField
+import com.laundry_kos.core.designsystem.SimpleDropdownField
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.DateUtil
@@ -95,125 +103,174 @@ fun PenghuniListScreen(
 
     val bolehTambah = uiState.data?.bolehKelolaKontrak == true
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (bolehTambah) {
-                FloatingActionButton(
-                    onClick = viewModel::openTambahDialog,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = "Daftarkan Penghuni")
-                }
-            }
-        },
-    ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = uiState.refreshing,
-            onRefresh = { viewModel.load(isRefresh = true) },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 84.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                item {
-                    MonthSelectorBar(
-                        bulanYm = uiState.bulan,
-                        onChangeBulan = viewModel::setBulan,
-                    )
-                }
-
-                item {
-                    OutlinedTextField(
-                        value = uiState.cari,
-                        onValueChange = viewModel::setCari,
-                        placeholder = { Text("Cari nama, kamar, atau nomor WA...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
-                val hitungan = uiState.data?.hitungan
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            floatingActionButton = {
+                if (bolehTambah) {
+                    FloatingActionButton(
+                        onClick = viewModel::openTambahDialog,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ) {
-                        listOf(
-                            "semua" to "Semua (${hitungan?.semua ?: 0})",
-                            "aktif" to "Aktif (${hitungan?.aktif ?: 0})",
-                            "booking" to "Booking (${hitungan?.booking ?: 0})",
-                            "keluar" to "Keluar (${hitungan?.keluar ?: 0})",
-                        ).forEach { (key, label) ->
-                            FilterChip(
-                                selected = uiState.tab == key,
-                                onClick = { viewModel.setTab(key) },
-                                label = { Text(label) },
-                            )
-                        }
+                        Icon(Icons.Default.PersonAdd, contentDescription = "Daftarkan Penghuni")
                     }
                 }
-
-                if (uiState.error != null) {
+            },
+        ) { innerPadding ->
+            PullToRefreshBox(
+                isRefreshing = uiState.refreshing,
+                onRefresh = { viewModel.load(isRefresh = true) },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 84.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     item {
-                        ErrorBannerCard(message = uiState.error!!, onRetry = { viewModel.load() })
-                    }
-                }
-
-                val data = uiState.data
-                if (uiState.loading && data == null) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                } else if (data != null && data.data.isEmpty()) {
-                    item {
-                        EmptyStateCard(
-                            title = "Tidak ada data penghuni",
-                            subtitle = "Ubah filter tab atau pencarian.",
+                        MonthSelectorBar(
+                            bulanYm = uiState.bulan,
+                            onChangeBulan = viewModel::setBulan,
                         )
                     }
-                } else if (data != null) {
-                    if (isWide) {
-                        items(data.data.chunked(2)) { pair ->
+
+                    item {
+                        OutlinedTextField(
+                            value = uiState.cari,
+                            onValueChange = viewModel::setCari,
+                            placeholder = { Text("Cari nama, kamar, atau nomor WA...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ext.muted) },
+                            trailingIcon = if (uiState.cari.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { viewModel.setCari("") }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Bersihkan pencarian", tint = ext.muted)
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(18.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedBorderColor = ext.lineStrong,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    val hitungan = uiState.data?.hitungan
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, ext.line),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.Top,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                pair.forEach { penghuni ->
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        PenghuniItemCard(
-                                            penghuni = penghuni,
-                                            onClick = { onOpenDetail(penghuni.id) },
+                                listOf(
+                                    "semua" to "Semua (${hitungan?.semua ?: 0})",
+                                    "aktif" to "Aktif (${hitungan?.aktif ?: 0})",
+                                    "booking" to "Booking (${hitungan?.booking ?: 0})",
+                                    "keluar" to "Keluar (${hitungan?.keluar ?: 0})",
+                                ).forEach { (key, label) ->
+                                    val selected = uiState.tab == key
+                                    Surface(
+                                        onClick = { viewModel.setTab(key) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (selected) MaterialTheme.colorScheme.primary else ext.surfaceAlt,
+                                        contentColor = if (selected) Color.White else ext.muted,
+                                        border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else ext.line),
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 11.sp,
+                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                            ),
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 4.dp, vertical = 8.dp),
                                         )
                                     }
                                 }
-                                if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
                             }
                         }
-                    } else {
-                        items(data.data, key = { it.id }) { penghuni ->
-                            PenghuniItemCard(
-                                penghuni = penghuni,
-                                onClick = { onOpenDetail(penghuni.id) },
+                    }
+
+                    if (uiState.error != null) {
+                        item {
+                            ErrorBannerCard(message = uiState.error!!, onRetry = { viewModel.load() })
+                        }
+                    }
+
+                    val data = uiState.data
+                    if (uiState.loading && data == null) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    } else if (data != null && data.data.isEmpty()) {
+                        item {
+                            EmptyStateCard(
+                                title = "Tidak ada data penghuni",
+                                subtitle = "Ubah filter tab atau pencarian.",
                             )
+                        }
+                    } else if (data != null) {
+                        if (isWide) {
+                            items(data.data.chunked(2)) { pair ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.Top,
+                                ) {
+                                    pair.forEach { penghuni ->
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            PenghuniItemCard(
+                                                penghuni = penghuni,
+                                                onClick = { onOpenDetail(penghuni.id) },
+                                            )
+                                        }
+                                    }
+                                    if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        } else {
+                            items(data.data, key = { it.id }) { penghuni ->
+                                PenghuniItemCard(
+                                    penghuni = penghuni,
+                                    onClick = { onOpenDetail(penghuni.id) },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+
+        LaundrySnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
+        )
     }
 
     if (uiState.showTambahDialog) {
@@ -310,11 +367,9 @@ private fun TambahPenghuniDialog(
     var noWa by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("aktif") }
     var selectedKamar by remember { mutableStateOf<KamarDto?>(null) }
-    var kamarExpanded by remember { mutableStateOf(false) }
     var tanggalMasuk by remember { mutableStateOf(DateUtil.todayIso()) }
     var perkiraan by remember { mutableStateOf(false) }
     var jangkaWaktu by remember { mutableStateOf("tidak_tentu") }
-    var jangkaExpanded by remember { mutableStateOf(false) }
     var tanggalKeluarRencana by remember { mutableStateOf("") }
     var catatan by remember { mutableStateOf("") }
 
@@ -337,6 +392,7 @@ private fun TambahPenghuniDialog(
                     onValueChange = { nama = it },
                     label = { Text("Nama Lengkap *") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -344,6 +400,7 @@ private fun TambahPenghuniDialog(
                     onValueChange = { alias = it },
                     label = { Text("Panggilan / Alias") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -352,34 +409,21 @@ private fun TambahPenghuniDialog(
                     FilterChip(selected = status == "booking", onClick = { status = "booking" }, label = { Text("Booking") })
                 }
 
-                // Kamar Kosong Dropdown
-                Box {
-                    OutlinedTextField(
-                        value = selectedKamar?.let { "Kamar ${it.nomor} (Lt. ${it.lantai})" } ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Kamar Kosong *") },
-                        placeholder = { Text(if (loadingKamar) "Memuat kamar..." else "Pilih kamar kosong") },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Box(modifier = Modifier.matchParentSize().clickable { kamarExpanded = true })
-                    DropdownMenu(expanded = kamarExpanded, onDismissRequest = { kamarExpanded = false }) {
-                        if (kamarKosong.isEmpty()) {
-                            DropdownMenuItem(text = { Text("Tidak ada kamar kosong") }, onClick = { kamarExpanded = false })
-                        } else {
-                            kamarKosong.forEach { kamar ->
-                                DropdownMenuItem(
-                                    text = { Text("Kamar ${kamar.nomor} (Lt. ${kamar.lantai})") },
-                                    onClick = {
-                                        selectedKamar = kamar
-                                        kamarExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
+                // Combobox inline Kamar Kosong (bisa ketik nomor kamar langsung)
+                SearchableDropdownField(
+                    label = "Kamar Kosong *",
+                    items = kamarKosong,
+                    selectedItem = selectedKamar,
+                    itemLabel = { k -> "Kamar ${k.nomor} (Lt. ${k.lantai})" },
+                    onSelect = { selectedKamar = it },
+                    placeholder = "Ketik nomor kamar kosong...",
+                    emptyText = "Tidak ada kamar kosong.",
+                    loading = loadingKamar,
+                    matchPredicate = { k, q ->
+                        k.nomor.contains(q, ignoreCase = true) ||
+                            k.lantai.toString().contains(q, ignoreCase = true)
+                    },
+                )
 
                 DatePickerField(
                     label = "Tanggal Masuk *",
@@ -395,30 +439,13 @@ private fun TambahPenghuniDialog(
                     Text("Tanggal masuk perkiraan", style = MaterialTheme.typography.bodySmall)
                 }
 
-                // Jangka Waktu Dropdown
-                Box {
-                    val labelJangka = JANGKA_WAKTU_OPTIONS.firstOrNull { it.first == jangkaWaktu }?.second ?: "Tidak Tentu"
-                    OutlinedTextField(
-                        value = labelJangka,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Jangka Waktu Sewa") },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Box(modifier = Modifier.matchParentSize().clickable { jangkaExpanded = true })
-                    DropdownMenu(expanded = jangkaExpanded, onDismissRequest = { jangkaExpanded = false }) {
-                        JANGKA_WAKTU_OPTIONS.forEach { (key, lbl) ->
-                            DropdownMenuItem(
-                                text = { Text(lbl) },
-                                onClick = {
-                                    jangkaWaktu = key
-                                    jangkaExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
+                SimpleDropdownField(
+                    label = "Jangka Waktu Sewa",
+                    items = JANGKA_WAKTU_OPTIONS,
+                    selectedItem = JANGKA_WAKTU_OPTIONS.firstOrNull { it.first == jangkaWaktu },
+                    itemLabel = { it.second },
+                    onSelect = { jangkaWaktu = it.first },
+                )
 
                 DatePickerField(
                     label = "Rencana Keluar (opsional)",
@@ -432,6 +459,7 @@ private fun TambahPenghuniDialog(
                     label = { Text("Nomor WhatsApp") },
                     placeholder = { Text("08xxx / 628xxx") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -441,6 +469,7 @@ private fun TambahPenghuniDialog(
                     onValueChange = { catatan = it },
                     label = { Text("Catatan") },
                     minLines = 2,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

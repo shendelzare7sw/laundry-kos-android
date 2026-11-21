@@ -2,7 +2,6 @@ package com.laundry_kos.feature.laundry
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,18 +11,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PersonAddAlt1
@@ -33,16 +31,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,8 +52,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.laundry_kos.core.designsystem.DatePickerField
 import com.laundry_kos.core.designsystem.EmptyStateCard
@@ -66,10 +66,12 @@ import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.LoadMoreButton
+import com.laundry_kos.core.designsystem.SearchableDropdownField
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
+import com.laundry_kos.data.dto.InfoKuotaPenghuniDto
 import com.laundry_kos.data.dto.LaundryDto
 import com.laundry_kos.data.dto.PermissionsDto
 
@@ -83,7 +85,7 @@ private val PERIODE_OPTIONS = listOf(
 )
 
 private val JENIS_OPTIONS = listOf(
-    "" to "Semua Jenis",
+    "" to "Semua",
     "penghuni" to "Penghuni",
     "gedung" to "Gedung",
     "tanpa_nama" to "Tanpa Nama",
@@ -111,258 +113,329 @@ fun LaundryListScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (permissions.catatLaundry) {
-                FloatingActionButton(
-                    onClick = onAddLaundry,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Catat Laundry")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            floatingActionButton = {
+                if (permissions.catatLaundry) {
+                    FloatingActionButton(
+                        onClick = onAddLaundry,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Catat Laundry")
+                    }
                 }
-            }
-        },
-    ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = uiState.refreshing,
-            onRefresh = { viewModel.load(isRefresh = true) },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 84.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+            },
+        ) { innerPadding ->
+            PullToRefreshBox(
+                isRefreshing = uiState.refreshing,
+                onRefresh = { viewModel.load(isRefresh = true) },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
             ) {
-                item {
-                    OutlinedTextField(
-                        value = uiState.cari,
-                        onValueChange = viewModel::setCari,
-                        placeholder = { Text("Cari nama, kamar, item, catatan...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        PERIODE_OPTIONS.forEach { (key, label) ->
-                            FilterChip(
-                                selected = uiState.periode == key,
-                                onClick = { viewModel.setPeriode(key) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                }
-
-                if (uiState.periode == "rentang") {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 84.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    // Searchbar sudut lembut (rounded pill/soft)
                     item {
-                        Row(
+                        OutlinedTextField(
+                            value = uiState.cari,
+                            onValueChange = viewModel::setCari,
+                            placeholder = { Text("Cari nama, kamar, penanda, item...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = ext.muted) },
+                            trailingIcon = if (uiState.cari.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { viewModel.setCari("") }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Bersihkan pencarian", tint = ext.muted)
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(18.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedBorderColor = ext.lineStrong,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            ),
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            DatePickerField(
-                                label = "Dari",
-                                valueIso = uiState.dari,
-                                onValueSelected = { viewModel.setRentang(it, uiState.sampai) },
-                                modifier = Modifier.weight(1f),
-                            )
-                            DatePickerField(
-                                label = "Sampai",
-                                valueIso = uiState.sampai,
-                                onValueSelected = { viewModel.setRentang(uiState.dari, it) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        JENIS_OPTIONS.forEach { (key, label) ->
-                            FilterChip(
-                                selected = uiState.jenis == key,
-                                onClick = { viewModel.setJenis(key) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                }
-
-                val data = uiState.data
-                if (data != null) {
-                    item {
-                        val r = data.ringkasan
-                        LaundryCard(containerColor = ext.surfaceAlt, contentPadding = PaddingValues(12.dp)) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(
-                                        text = "${data.rentang.label} · ${r.jumlahCatatan} catatan",
-                                        style = MaterialTheme.typography.titleSmall,
-                                    )
-                                    Text(
-                                        text = "${r.totalBeratKg} kg",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(
-                                        text = "Utama: ${Formatters.formatRupiah(r.totalBiayaUtama)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                    Text(
-                                        text = "Terpisah: ${Formatters.formatRupiah(r.totalBayarTerpisah)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = ext.onGold,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if ((permissions.lengkapiHarga && data.pratinjauLengkapiHarga.jumlah > 0) ||
-                        (permissions.lihatTerhapus && data.jumlahTerhapus > 0)
-                    ) {
-                        item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                if (permissions.lengkapiHarga && data.pratinjauLengkapiHarga.jumlah > 0) {
-                                    OutlinedButton(
-                                        onClick = { showLengkapiConfirm = true },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = BorderStroke(1.dp, ext.gold),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ext.onGold),
-                                    ) {
-                                        Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Lengkapi Harga (${data.pratinjauLengkapiHarga.jumlah})", style = MaterialTheme.typography.labelMedium)
-                                    }
-                                }
-                                if (permissions.lihatTerhapus && data.jumlahTerhapus > 0) {
-                                    OutlinedButton(
-                                        onClick = viewModel::openTerhapusDialog,
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(10.dp),
-                                    ) {
-                                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Terhapus (${data.jumlahTerhapus})", style = MaterialTheme.typography.labelMedium)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (uiState.error != null) {
-                    item {
-                        ErrorBannerCard(
-                            message = uiState.error!!,
-                            onRetry = { viewModel.load() },
                         )
                     }
-                }
 
-                if (uiState.loading && data == null) {
+                    // Filter Periode dibungkus rapi dalam container grid (3 kolom portrait / 6 kolom landscape)
                     item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center,
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, ext.line),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                } else if (data != null && data.data.isEmpty()) {
-                    item {
-                        EmptyStateCard(
-                            title = "Belum ada catatan laundry",
-                            subtitle = "Ubah filter periode atau tekan tombol + untuk mencatat laundry baru.",
-                        )
-                    }
-                } else if (data != null) {
-                    if (isWide) {
-                        items(data.data.chunked(2)) { pair ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.Top,
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                pair.forEach { item ->
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        LaundryRowCard(
-                                            item = item,
-                                            onEdit = { onEditLaundry(item.id) },
-                                            onDelete = { deleteConfirmTarget = item },
-                                            onTetapkanPemilik = { viewModel.openTetapkanPemilik(item) },
+                                Text(
+                                    text = "Periode Waktu",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = ext.muted,
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                )
+                                val periodeRows = if (isWide) listOf(PERIODE_OPTIONS) else PERIODE_OPTIONS.chunked(3)
+                                periodeRows.forEach { rowItems ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        rowItems.forEach { (key, label) ->
+                                            SegmentedFilterPill(
+                                                label = label,
+                                                selected = uiState.periode == key,
+                                                onClick = { viewModel.setPeriode(key) },
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (uiState.periode == "rentang") {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        DatePickerField(
+                                            label = "Dari",
+                                            valueIso = uiState.dari,
+                                            onValueSelected = { viewModel.setRentang(it, uiState.sampai) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        DatePickerField(
+                                            label = "Sampai",
+                                            valueIso = uiState.sampai,
+                                            onValueSelected = { viewModel.setRentang(uiState.dari, it) },
+                                            modifier = Modifier.weight(1f),
                                         )
                                     }
                                 }
-                                if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
                             }
                         }
-                    } else {
-                        items(data.data, key = { it.id }) { item ->
-                            LaundryRowCard(
-                                item = item,
-                                onEdit = { onEditLaundry(item.id) },
-                                onDelete = { deleteConfirmTarget = item },
-                                onTetapkanPemilik = { viewModel.openTetapkanPemilik(item) },
+                    }
+
+                    // Filter Jenis Laundry dibungkus rapi dalam container terpisah
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, ext.line),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = "Jenis Laundry",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = ext.muted,
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    JENIS_OPTIONS.forEach { (key, label) ->
+                                        SegmentedFilterPill(
+                                            label = label,
+                                            selected = uiState.jenis == key,
+                                            useGoldHighlight = true,
+                                            onClick = { viewModel.setJenis(key) },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    val data = uiState.data
+                    if (data != null) {
+                        item {
+                            val r = data.ringkasan
+                            LaundryCard(containerColor = ext.surfaceAlt, contentPadding = PaddingValues(12.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            text = "${data.rentang.label} · ${r.jumlahCatatan} catatan",
+                                            style = MaterialTheme.typography.titleSmall,
+                                        )
+                                        Text(
+                                            text = "${r.totalBeratKg} kg",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            text = "Utama: ${Formatters.formatRupiah(r.totalBiayaUtama)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        Text(
+                                            text = "Terpisah: ${Formatters.formatRupiah(r.totalBayarTerpisah)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = ext.onGold,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if ((permissions.lengkapiHarga && data.pratinjauLengkapiHarga.jumlah > 0) ||
+                            (permissions.lihatTerhapus && data.jumlahTerhapus > 0)
+                        ) {
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    if (permissions.lengkapiHarga && data.pratinjauLengkapiHarga.jumlah > 0) {
+                                        OutlinedButton(
+                                            onClick = { showLengkapiConfirm = true },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(10.dp),
+                                            border = BorderStroke(1.dp, ext.gold),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ext.onGold),
+                                        ) {
+                                            Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Lengkapi Harga (${data.pratinjauLengkapiHarga.jumlah})", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+                                    if (permissions.lihatTerhapus && data.jumlahTerhapus > 0) {
+                                        OutlinedButton(
+                                            onClick = viewModel::openTerhapusDialog,
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(10.dp),
+                                        ) {
+                                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Terhapus (${data.jumlahTerhapus})", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (uiState.error != null) {
+                        item {
+                            ErrorBannerCard(
+                                message = uiState.error!!,
+                                onRetry = { viewModel.load() },
                             )
                         }
                     }
 
-                    if (data.meta.adaLagi) {
+                    if (uiState.loading && data == null) {
                         item {
-                            LoadMoreButton(
-                                ditampilkan = data.meta.ditampilkan,
-                                total = data.meta.total,
-                                loading = uiState.loadingMore,
-                                onClick = viewModel::loadMore,
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    } else if (data != null && data.data.isEmpty()) {
+                        item {
+                            EmptyStateCard(
+                                title = "Belum ada catatan laundry",
+                                subtitle = "Ubah filter periode atau tekan tombol + untuk mencatat laundry baru.",
                             )
+                        }
+                    } else if (data != null) {
+                        if (isWide) {
+                            items(data.data.chunked(2)) { pair ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.Top,
+                                ) {
+                                    pair.forEach { item ->
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            LaundryRowCard(
+                                                item = item,
+                                                onEdit = { onEditLaundry(item.id) },
+                                                onDelete = { deleteConfirmTarget = item },
+                                                onTetapkanPemilik = { viewModel.openTetapkanPemilik(item) },
+                                            )
+                                        }
+                                    }
+                                    if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        } else {
+                            items(data.data, key = { it.id }) { item ->
+                                LaundryRowCard(
+                                    item = item,
+                                    onEdit = { onEditLaundry(item.id) },
+                                    onDelete = { deleteConfirmTarget = item },
+                                    onTetapkanPemilik = { viewModel.openTetapkanPemilik(item) },
+                                )
+                            }
+                        }
+
+                        if (data.meta.adaLagi) {
+                            item {
+                                LoadMoreButton(
+                                    ditampilkan = data.meta.ditampilkan,
+                                    total = data.meta.total,
+                                    loading = uiState.loadingMore,
+                                    onClick = viewModel::loadMore,
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+
+        // Toast ditempatkan di bawah sejajar/menutup FAB (bukan melayang tinggi di atas FAB)
+        LaundrySnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
+        )
     }
 
     // Konfirmasi Hapus
     deleteConfirmTarget?.let { target ->
+        val targetLabel = when (target.jenis) {
+            "penghuni" -> target.penghuniNama ?: target.jenisLabel
+            "tanpa_nama" -> target.namaTanpaNama?.takeIf { it.isNotBlank() }?.let { "Tanpa Nama · $it" } ?: "Tanpa Nama"
+            else -> target.jenisLabel
+        }
         AlertDialog(
             onDismissRequest = { deleteConfirmTarget = null },
             title = { Text("Hapus Catatan Laundry?") },
             text = {
                 Text(
-                    "Catatan tanggal ${DateUtil.formatIsoDateLabel(target.tanggal)} (${target.penghuniNama ?: target.jenisLabel}) akan dihapus lunak dan bisa dipulihkan oleh pengelola.",
+                    "Catatan tanggal ${DateUtil.formatIsoDateLabel(target.tanggal)} ($targetLabel) akan dihapus lunak dan bisa dipulihkan oleh pengelola.",
                 )
             },
             confirmButton = {
@@ -446,8 +519,11 @@ fun LaundryListScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
+                                        val rowTitle = row.penghuniNama
+                                            ?: row.namaTanpaNama?.takeIf { it.isNotBlank() }?.let { "Tanpa Nama · $it" }
+                                            ?: row.jenisLabel
                                         Text(
-                                            text = row.penghuniNama ?: row.jenisLabel,
+                                            text = rowTitle,
                                             style = MaterialTheme.typography.titleSmall,
                                         )
                                         Text(
@@ -485,57 +561,103 @@ fun LaundryListScreen(
         )
     }
 
-    // Dialog Tetapkan Pemilik (untuk catatan tanpa_nama)
+    // Dialog Tetapkan Pemilik memakai Combobox inline langsung
     uiState.tetapkanTarget?.let { target ->
-        var filterNama by remember { mutableStateOf("") }
+        var selectedPenghuni by remember(target.id) { mutableStateOf<InfoKuotaPenghuniDto?>(null) }
         AlertDialog(
             onDismissRequest = viewModel::dismissTetapkanPemilik,
-            title = { Text("Tetapkan Pemilik (${DateUtil.formatIsoDateLabel(target.tanggal)})") },
+            title = { Text("Tetapkan Pemilik") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = filterNama,
-                        onValueChange = { filterNama = it },
-                        placeholder = { Text("Cari kamar atau nama penghuni...") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    if (uiState.tetapkanLoading) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    } else {
-                        val filtered = uiState.tetapkanPenghuniList.filter {
-                            filterNama.isBlank() ||
-                                it.nama.contains(filterNama, ignoreCase = true) ||
-                                it.kamar.contains(filterNama, ignoreCase = true)
-                        }
-                        if (filtered.isEmpty()) {
-                            Text("Tidak ada penghuni aktif pada tanggal tersebut.", style = MaterialTheme.typography.bodySmall)
-                        } else {
-                            LazyColumn(modifier = Modifier.heightIn(max = 260.dp)) {
-                                items(filtered, key = { it.id }) { p ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { viewModel.confirmTetapkanPemilik(p.id) }
-                                            .padding(vertical = 10.dp, horizontal = 6.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                    ) {
-                                        Text(p.label.ifBlank { "Kamar ${p.kamar} · ${p.nama}" }, style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                    HorizontalDivider(color = ext.line)
-                                }
-                            }
-                        }
+                    val info = buildString {
+                        append(DateUtil.formatIsoDateLabel(target.tanggal))
+                        target.namaTanpaNama?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+                        val b = Formatters.formatBeratKg(target.beratCenti, target.beratLabel)
+                        if (b != "-") append(" · $b")
                     }
+                    Text(info, style = MaterialTheme.typography.bodySmall, color = ext.muted)
+                    SearchableDropdownField(
+                        label = "Penghuni",
+                        items = uiState.tetapkanPenghuniList,
+                        selectedItem = selectedPenghuni,
+                        itemLabel = { p -> p.label.ifBlank { "Kamar ${p.kamar} · ${p.nama}" } },
+                        onSelect = { selectedPenghuni = it },
+                        placeholder = "Ketik kamar atau nama...",
+                        emptyText = "Tidak ada penghuni aktif pada tanggal ini.",
+                        loading = uiState.tetapkanLoading,
+                        matchPredicate = { p, q ->
+                            p.nama.contains(q, ignoreCase = true) ||
+                                (p.alias?.contains(q, ignoreCase = true) == true) ||
+                                p.kamar.contains(q, ignoreCase = true) ||
+                                p.label.contains(q, ignoreCase = true)
+                        },
+                    )
                 }
             },
             confirmButton = {
+                TextButton(
+                    enabled = selectedPenghuni != null,
+                    onClick = {
+                        selectedPenghuni?.let { viewModel.confirmTetapkanPemilik(it.id) }
+                    },
+                ) {
+                    Text("Tetapkan")
+                }
+            },
+            dismissButton = {
                 TextButton(onClick = viewModel::dismissTetapkanPemilik) {
                     Text("Batal")
                 }
             },
+        )
+    }
+}
+
+@Composable
+private fun SegmentedFilterPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    useGoldHighlight: Boolean = false,
+) {
+    val ext = LaundryKosTheme.extendedColors
+    val containerColor = when {
+        selected && useGoldHighlight -> ext.goldContainer
+        selected -> MaterialTheme.colorScheme.primary
+        else -> ext.surfaceAlt
+    }
+    val contentColor = when {
+        selected && useGoldHighlight -> ext.onGold
+        selected -> Color.White
+        else -> ext.muted
+    }
+    val borderColor = when {
+        selected && useGoldHighlight -> ext.gold.copy(alpha = 0.55f)
+        selected -> MaterialTheme.colorScheme.primary
+        else -> ext.line
+    }
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = containerColor,
+        contentColor = contentColor,
+        border = BorderStroke(1.dp, borderColor),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            ),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 8.dp),
         )
     }
 }
@@ -555,7 +677,10 @@ private fun LaundryRowCard(
             "$kamar${item.penghuniNama ?: "Penghuni"}"
         }
         "gedung" -> "GDG · Laundry Gedung"
-        else -> "Tanpa Nama"
+        else -> {
+            val tag = item.namaTanpaNama?.takeIf { it.isNotBlank() }
+            if (tag != null) "Tanpa Nama · $tag" else "Tanpa Nama"
+        }
     }
     val biayaLabel = if (item.biayaUtama != null) {
         Formatters.formatRupiah(item.biayaUtama) + if (item.biayaManual) "*" else ""
@@ -575,7 +700,6 @@ private fun LaundryRowCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Kiri: Judul + metadata ringkas (tanggal · berat · pencatat)
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -588,6 +712,9 @@ private fun LaundryRowCard(
                             text = judul,
                             style = MaterialTheme.typography.titleSmall,
                             color = if (item.lewatKuota) ext.danger else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
                         if (item.lewatKuota) {
                             StatusBadge(
@@ -616,7 +743,6 @@ private fun LaundryRowCard(
                     )
                 }
 
-                // Kanan: Harga sejajar dengan ikon hapus ringkas (tanpa baris aksi bawah terpisah)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -652,7 +778,6 @@ private fun LaundryRowCard(
                 }
             }
 
-            // Strip ringkas item terpisah jika ada
             if (item.item.isNotEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),

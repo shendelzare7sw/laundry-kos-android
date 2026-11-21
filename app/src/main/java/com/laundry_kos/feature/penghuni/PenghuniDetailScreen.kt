@@ -1,16 +1,16 @@
 package com.laundry_kos.feature.penghuni
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -35,8 +34,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -46,7 +43,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,10 +56,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.laundry_kos.R
@@ -75,14 +74,23 @@ import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.MonthSelectorBar
+import com.laundry_kos.core.designsystem.SearchableDropdownField
 import com.laundry_kos.core.designsystem.StatusBadge
+import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.core.util.WhatsAppIntent
 import com.laundry_kos.data.dto.KamarDto
 import com.laundry_kos.data.dto.UbahPenghuniRequestDto
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+private data class PenghuniActionItem(
+    val label: String,
+    val icon: ImageVector,
+    val isDanger: Boolean = false,
+    val onClick: () -> Unit,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PenghuniDetailScreen(
     viewModel: PenghuniDetailViewModel,
@@ -91,6 +99,7 @@ fun PenghuniDetailScreen(
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val ext = LaundryKosTheme.extendedColors
+    val isWide = rememberIsWideLayout()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -210,81 +219,128 @@ fun PenghuniDetailScreen(
                                 Text("Catatan: ${p.catatan}", style = MaterialTheme.typography.bodySmall, color = ext.muted)
                             }
 
-                            // Tombol WA
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                data.waTagihan?.let { wa ->
-                                    if ((wa.totalTagihan ?: 0) > 0) {
+                            // Tombol WA (seimbang full-width di portrait & landscape)
+                            val waTagihanValid = data.waTagihan?.takeIf { (it.totalTagihan ?: 0) > 0 }
+                            val waPeringatanValid = data.waPeringatan
+                            if (waTagihanValid != null || waPeringatanValid != null) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    waTagihanValid?.let { wa ->
                                         Button(
                                             onClick = {
                                                 WhatsAppIntent.openUrlOrCopy(context, wa.url, wa.pesan, "WA Tagihan")
                                             },
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = ext.whatsapp),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(42.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = ext.whatsapp,
+                                                contentColor = Color.White,
+                                            ),
                                         ) {
                                             Icon(painterResource(R.drawable.ic_whatsapp), contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text("WA Tagihan (${Formatters.formatRupiah(wa.totalTagihan)})", style = MaterialTheme.typography.labelMedium)
+                                            Text(
+                                                text = "WA Tagihan (${Formatters.formatRupiah(wa.totalTagihan)})",
+                                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
                                         }
                                     }
-                                }
-                                data.waPeringatan?.let { wa ->
-                                    OutlinedButton(
-                                        onClick = {
-                                            WhatsAppIntent.openUrlOrCopy(context, wa.url, wa.pesan, "WA Peringatan")
-                                        },
-                                        shape = RoundedCornerShape(10.dp),
-                                    ) {
-                                        Text("WA Peringatan", style = MaterialTheme.typography.labelMedium)
+                                    waPeringatanValid?.let { wa ->
+                                        OutlinedButton(
+                                            onClick = {
+                                                WhatsAppIntent.openUrlOrCopy(context, wa.url, wa.pesan, "WA Peringatan")
+                                            },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(42.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = BorderStroke(1.dp, ext.lineStrong),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                        ) {
+                                            Text(
+                                                text = "WA Peringatan",
+                                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            // Tombol Aksi Kontrak & Nomor
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
+                            // Tombol Aksi Kontrak & Nomor (grid rapi 2 kolom portrait / 4 kolom landscape)
+                            val actionItems = buildList {
                                 if (perms.bolehKelolaPenghuni) {
-                                    OutlinedButton(onClick = { showEditDialog = true }) {
-                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Edit")
-                                    }
-                                    OutlinedButton(onClick = { showGantiNomorDialog = true }) {
-                                        Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Ganti WA")
-                                    }
+                                    add(PenghuniActionItem("Edit", Icons.Default.Edit) { showEditDialog = true })
+                                    add(PenghuniActionItem("Ganti WA", Icons.Default.Phone) { showGantiNomorDialog = true })
                                 }
                                 if (perms.bolehKelolaKontrak && p.status != "keluar") {
-                                    OutlinedButton(
-                                        onClick = {
+                                    add(
+                                        PenghuniActionItem("Pindah Kamar", Icons.Default.SwapHoriz) {
                                             viewModel.loadKamarKosong()
                                             showPindahDialog = true
                                         },
-                                    ) {
-                                        Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Pindah Kamar")
-                                    }
-                                    OutlinedButton(onClick = { showKeluarDialog = true }) {
-                                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Keluar", color = ext.danger)
-                                    }
+                                    )
+                                    add(PenghuniActionItem("Keluar", Icons.AutoMirrored.Filled.ExitToApp, isDanger = true) { showKeluarDialog = true })
                                 }
                                 if (perms.bisaBatalkanPindah) {
-                                    OutlinedButton(onClick = viewModel::batalkanPindah) {
-                                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Batal Pindah")
-                                    }
+                                    add(PenghuniActionItem("Batal Pindah", Icons.AutoMirrored.Filled.Undo) { viewModel.batalkanPindah() })
                                 }
                                 if (perms.bolehKelolaKontrak && p.status == "keluar") {
-                                    OutlinedButton(onClick = viewModel::batalkanKeluar) {
-                                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Batalkan Keluar")
+                                    add(PenghuniActionItem("Batalkan Keluar", Icons.AutoMirrored.Filled.Undo) { viewModel.batalkanKeluar() })
+                                }
+                            }
+                            if (actionItems.isNotEmpty()) {
+                                val columns = if (isWide) 4 else 2
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 2.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    actionItems.chunked(columns).forEach { rowBtns ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            rowBtns.forEach { btn ->
+                                                val fg = if (btn.isDanger) ext.danger else MaterialTheme.colorScheme.primary
+                                                val border = if (btn.isDanger) ext.danger.copy(alpha = 0.45f) else ext.lineStrong
+                                                OutlinedButton(
+                                                    onClick = btn.onClick,
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(40.dp),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    border = BorderStroke(1.dp, border),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = fg),
+                                                ) {
+                                                    Icon(btn.icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = btn.label,
+                                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                }
+                                            }
+                                            if (isWide && rowBtns.size < columns) {
+                                                repeat(columns - rowBtns.size) {
+                                                    Spacer(modifier = Modifier.weight(1f))
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -529,7 +585,6 @@ fun PenghuniDetailScreen(
 
         if (showPindahDialog) {
             var selectedKamar by remember { mutableStateOf<KamarDto?>(null) }
-            var expanded by remember { mutableStateOf(false) }
             var tglPindah by remember { mutableStateOf(DateUtil.todayIso()) }
             AlertDialog(
                 onDismissRequest = { showPindahDialog = false },
@@ -537,28 +592,19 @@ fun PenghuniDetailScreen(
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Kuota bulan berjalan tetap utuh setelah pindah kamar.", style = MaterialTheme.typography.bodySmall, color = ext.muted)
-                        Box {
-                            OutlinedTextField(
-                                value = selectedKamar?.let { "Kamar ${it.nomor} (Lt. ${it.lantai})" } ?: "",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Kamar Tujuan Kosong *") },
-                                trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Box(modifier = Modifier.matchParentSize().clickable { expanded = true })
-                            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                                uiState.kamarKosong.forEach { k ->
-                                    DropdownMenuItem(
-                                        text = { Text("Kamar ${k.nomor} (Lt. ${k.lantai})") },
-                                        onClick = {
-                                            selectedKamar = k
-                                            expanded = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
+                        SearchableDropdownField(
+                            label = "Kamar Tujuan Kosong *",
+                            items = uiState.kamarKosong,
+                            selectedItem = selectedKamar,
+                            itemLabel = { k -> "Kamar ${k.nomor} (Lt. ${k.lantai})" },
+                            onSelect = { selectedKamar = it },
+                            placeholder = "Ketik nomor kamar kosong...",
+                            emptyText = "Tidak ada kamar kosong.",
+                            matchPredicate = { k, q ->
+                                k.nomor.contains(q, ignoreCase = true) ||
+                                    k.lantai.toString().contains(q, ignoreCase = true)
+                            },
+                        )
                         DatePickerField(label = "Tanggal Pindah", valueIso = tglPindah, onValueSelected = { tglPindah = it })
                     }
                 },

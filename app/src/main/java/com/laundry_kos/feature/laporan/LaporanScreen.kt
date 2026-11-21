@@ -117,11 +117,11 @@ fun LaporanScreen(
 
     val laporan = uiState.data
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
-        bottomBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            bottomBar = {
             if (laporan != null) {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
@@ -404,6 +404,14 @@ fun LaporanScreen(
                 }
             }
         }
+        }
+
+        LaundrySnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp),
+        )
     }
 
     if (showRekapWaModal && laporan != null) {
