@@ -55,6 +55,36 @@ class LaundryKosRepository(
     suspend fun fetchProperti(): ApiResult<PropertiListResponseDto> =
         safeApiCall(eventBus) { api.properti() }
 
+    suspend fun tambahProperti(request: SimpanPropertiRequestDto): ApiResult<PropertiMutasiResponseDto> =
+        safeApiCall(eventBus) { api.tambahProperti(request) }
+
+    suspend fun ubahProperti(id: Int, request: SimpanPropertiRequestDto): ApiResult<PropertiMutasiResponseDto> =
+        safeApiCall(eventBus) { api.ubahProperti(id, request) }
+
+    suspend fun fetchSetupProperti(id: Int): ApiResult<PropertiSetupResponseDto> =
+        safeApiCall(eventBus) { api.setupProperti(id) }
+
+    suspend fun setupKamar(id: Int, request: WizardKamarRequestDto): ApiResult<WizardKamarResponseDto> =
+        safeApiCall(eventBus) { api.setupKamar(id, request) }
+
+    suspend fun setupAturan(id: Int, request: SetupAturanDto): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.setupAturan(id, request) }
+
+    suspend fun setupAktifkan(id: Int): ApiResult<PropertiMutasiResponseDto> =
+        safeApiCall(eventBus) { api.setupAktifkan(id) }
+
+    suspend fun fetchPenggunaList(): ApiResult<PenggunaListResponseDto> =
+        safeApiCall(eventBus) { api.penggunaList() }
+
+    suspend fun tambahPengguna(request: SimpanPenggunaRequestDto): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.tambahPengguna(request) }
+
+    suspend fun toggleAktifPengguna(id: Int): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.toggleAktifPengguna(id) }
+
+    suspend fun resetPasswordPengguna(id: Int, request: ResetPasswordRequestDto): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.resetPasswordPengguna(id, request) }
+
     suspend fun fetchKamar(hanyaKosong: Boolean = false): ApiResult<KamarListResponseDto> =
         safeApiCall(eventBus) { api.kamar(kosong = if (hanyaKosong) 1 else null) }
 

@@ -65,6 +65,7 @@ import com.laundry_kos.core.designsystem.EmptyStateCard
 import com.laundry_kos.core.designsystem.ErrorBannerCard
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
+import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.LoadMoreButton
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
@@ -114,7 +115,7 @@ fun LaundryListScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (permissions.catatLaundry) {
                 FloatingActionButton(

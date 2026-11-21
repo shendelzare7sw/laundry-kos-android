@@ -42,12 +42,20 @@ class LaporanViewModel(
     }
 
     fun setPeriode(periode: String) {
-        _state.update { it.copy(periode = periode, editingPenghuniId = null) }
+        _state.update { it.copy(periode = periode, editingPenghuniId = null, inlineNominal = "") }
         load()
     }
 
     fun setRentang(dari: String, sampai: String) {
-        _state.update { it.copy(periode = "rentang", dari = dari, sampai = sampai, editingPenghuniId = null) }
+        _state.update {
+            it.copy(
+                periode = "rentang",
+                dari = dari,
+                sampai = sampai,
+                editingPenghuniId = null,
+                inlineNominal = "",
+            )
+        }
         load()
     }
 
@@ -63,6 +71,8 @@ class LaporanViewModel(
                 it.copy(
                     loading = !isRefresh && it.data == null,
                     refreshing = isRefresh,
+                    editingPenghuniId = null,
+                    inlineNominal = "",
                     error = null,
                 )
             }
@@ -74,7 +84,14 @@ class LaporanViewModel(
             )
             when (res) {
                 is ApiResult.Success -> _state.update {
-                    it.copy(loading = false, refreshing = false, data = res.data, error = null)
+                    it.copy(
+                        loading = false,
+                        refreshing = false,
+                        editingPenghuniId = null,
+                        inlineNominal = "",
+                        data = res.data,
+                        error = null,
+                    )
                 }
                 is ApiResult.Failure -> _state.update {
                     it.copy(loading = false, refreshing = false, error = res.error.summaryMessage())
@@ -101,6 +118,7 @@ class LaporanViewModel(
     }
 
     fun saveInlinePenyesuaian(penghuniId: Int, bulan: String, reset: Boolean) {
+        if (_state.value.inlineSaving) return
         val nominal = _state.value.inlineNominal.toIntOrNull()
         if (!reset && nominal == null) return
         viewModelScope.launch {
@@ -115,18 +133,42 @@ class LaporanViewModel(
             )
             when (res) {
                 is ApiResult.Success -> {
-                    _state.update {
-                        it.copy(
+                    val updatedKuota = res.data.kuota
+                    _state.update { cur ->
+                        // Segera tutup form inline dan perbarui nominal di kartu agar tidak ada jeda
+                        val patchedData = cur.data?.let { lap ->
+                            lap.copy(
+                                kartuPenghuni = lap.kartuPenghuni.map { kartu ->
+                                    if (kartu.penghuni.id == penghuniId) {
+                                        kartu.copy(
+                                            tagihanLewatKuota = updatedKuota.tagihanLewatKuota,
+                                            kuota = kartu.kuota.copy(
+                                                tagihanLewatKuota = updatedKuota.tagihanLewatKuota,
+                                                nominalPenyesuaian = updatedKuota.nominalPenyesuaian,
+                                                totalTagihan = updatedKuota.totalTagihan,
+                                            ),
+                                        )
+                                    } else {
+                                        kartu
+                                    }
+                                },
+                            )
+                        }
+                        cur.copy(
                             inlineSaving = false,
                             editingPenghuniId = null,
                             inlineNominal = "",
+                            data = patchedData,
                             snackbarMessage = res.data.message,
                         )
                     }
                     load(isRefresh = true)
                 }
                 is ApiResult.Failure -> _state.update {
-                    it.copy(inlineSaving = false, snackbarMessage = res.error.summaryMessage())
+                    it.copy(
+                        inlineSaving = false,
+                        snackbarMessage = res.error.summaryMessage(),
+                    )
                 }
             }
         }

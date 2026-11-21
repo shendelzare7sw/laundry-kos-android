@@ -4,6 +4,7 @@ import com.laundry_kos.data.dto.*
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -23,6 +24,48 @@ interface LaundryKosApi {
 
     @GET("properti")
     suspend fun properti(): PropertiListResponseDto
+
+    @POST("properti")
+    suspend fun tambahProperti(@Body request: SimpanPropertiRequestDto): PropertiMutasiResponseDto
+
+    @PUT("properti/{id}")
+    suspend fun ubahProperti(
+        @Path("id") id: Int,
+        @Body request: SimpanPropertiRequestDto,
+    ): PropertiMutasiResponseDto
+
+    @GET("properti/{id}/setup")
+    suspend fun setupProperti(@Path("id") id: Int): PropertiSetupResponseDto
+
+    @POST("properti/{id}/setup/kamar")
+    suspend fun setupKamar(
+        @Path("id") id: Int,
+        @Body request: WizardKamarRequestDto,
+    ): WizardKamarResponseDto
+
+    @POST("properti/{id}/setup/aturan")
+    suspend fun setupAturan(
+        @Path("id") id: Int,
+        @Body request: SetupAturanDto,
+    ): MessageResponseDto
+
+    @POST("properti/{id}/setup/aktifkan")
+    suspend fun setupAktifkan(@Path("id") id: Int): PropertiMutasiResponseDto
+
+    @GET("pengguna")
+    suspend fun penggunaList(): PenggunaListResponseDto
+
+    @POST("pengguna")
+    suspend fun tambahPengguna(@Body request: SimpanPenggunaRequestDto): MessageResponseDto
+
+    @PATCH("pengguna/{id}/status")
+    suspend fun toggleAktifPengguna(@Path("id") id: Int): MessageResponseDto
+
+    @PATCH("pengguna/{id}/reset-password")
+    suspend fun resetPasswordPengguna(
+        @Path("id") id: Int,
+        @Body request: ResetPasswordRequestDto,
+    ): MessageResponseDto
 
     @GET("kamar")
     suspend fun kamar(@Query("kosong") kosong: Int? = null): KamarListResponseDto

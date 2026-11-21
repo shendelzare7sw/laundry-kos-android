@@ -1,7 +1,6 @@
 package com.laundry_kos.navigation
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +22,7 @@ import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalLaundryService
+import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -101,10 +101,14 @@ import com.laundry_kos.feature.notifikasi.NotificationBellButton
 import com.laundry_kos.feature.notifikasi.NotificationListDialog
 import com.laundry_kos.feature.pengaturan.PengaturanScreen
 import com.laundry_kos.feature.pengaturan.PengaturanViewModel
+import com.laundry_kos.feature.pengguna.PenggunaScreen
+import com.laundry_kos.feature.pengguna.PenggunaViewModel
 import com.laundry_kos.feature.penghuni.PenghuniDetailScreen
 import com.laundry_kos.feature.penghuni.PenghuniDetailViewModel
 import com.laundry_kos.feature.penghuni.PenghuniListScreen
 import com.laundry_kos.feature.penghuni.PenghuniListViewModel
+import com.laundry_kos.feature.properti.PropertiSetupScreen
+import com.laundry_kos.feature.properti.PropertiSetupViewModel
 import kotlinx.coroutines.launch
 
 private enum class OperasionalTab(
@@ -119,6 +123,7 @@ private enum class OperasionalTab(
 }
 
 private const val ROUTE_PENGATURAN = "pengaturan"
+private const val ROUTE_PENGGUNA = "pengguna"
 private const val ROUTE_LAUNDRY_NEW = "laundry/new"
 private const val ROUTE_LAUNDRY_EDIT = "laundry/edit/{id}"
 private const val ROUTE_PENGHUNI_DETAIL = "penghuni/detail/{id}"
@@ -146,11 +151,10 @@ fun LaundryKosRoot(
             )
         }
         is SessionUiState.SelectProperti -> {
-            PropertiPickerScreen(
+            OwnerGedungNavHost(
                 uiState = state,
-                onSelect = sessionViewModel::selectProperti,
-                onRefresh = sessionViewModel::refreshPropertiList,
-                onLogout = sessionViewModel::logout,
+                repository = repository,
+                sessionViewModel = sessionViewModel,
             )
         }
         is SessionUiState.Authenticated -> {
@@ -162,6 +166,69 @@ fun LaundryKosRoot(
                     onLogout = sessionViewModel::logout,
                 )
             }
+        }
+    }
+}
+
+/**
+ * NavHost khusus Owner / DevAdmin saat berada di Panel Manajemen Global (sebelum masuk ke properti tertentu):
+ * - Daftar Gedung (Pilih, Tambah, Edit)
+ * - Setup Gedung (`/properti/{id}/setup`)
+ * - Kelola Pengguna (`/pengguna`)
+ */
+@Composable
+private fun OwnerGedungNavHost(
+    uiState: SessionUiState.SelectProperti,
+    repository: LaundryKosRepository,
+    sessionViewModel: SessionViewModel,
+) {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = "gedung/list") {
+        composable("gedung/list") {
+            PropertiPickerScreen(
+                uiState = uiState,
+                onSelect = sessionViewModel::selectProperti,
+                onRefresh = sessionViewModel::refreshPropertiList,
+                onTambahProperti = sessionViewModel::tambahProperti,
+                onUbahProperti = sessionViewModel::ubahProperti,
+                onOpenSetup = { propId -> navController.navigate("gedung/setup/$propId") },
+                onOpenPengguna = { navController.navigate("gedung/pengguna") },
+                onClearSnackbar = sessionViewModel::clearSelectPropertiSnackbar,
+                onLogout = sessionViewModel::logout,
+            )
+        }
+
+        composable(
+            route = "gedung/setup/{id}",
+            arguments = listOf(navArgument("id") { type = NavType.IntType }),
+        ) { entry ->
+            val id = entry.arguments?.getInt("id") ?: return@composable
+            val vm: PropertiSetupViewModel = viewModel(
+                key = "setup_$id",
+                factory = PropertiSetupViewModel.Factory(repository, id),
+            )
+            PropertiSetupScreen(
+                viewModel = vm,
+                onBack = {
+                    sessionViewModel.refreshPropertiList()
+                    navController.popBackStack()
+                },
+                onOpenKelolaPengguna = { navController.navigate("gedung/pengguna") },
+            )
+        }
+
+        composable("gedung/pengguna") {
+            val vm: PenggunaViewModel = viewModel(
+                key = "global_pengguna",
+                factory = PenggunaViewModel.Factory(repository),
+            )
+            PenggunaScreen(
+                viewModel = vm,
+                onBack = {
+                    sessionViewModel.refreshPropertiList()
+                    navController.popBackStack()
+                },
+            )
         }
     }
 }
@@ -183,6 +250,7 @@ private fun AuthenticatedAppShell(
 
     val isGlobalRole = authState.user.role == "owner" || authState.user.role == "dev_admin"
     val bolehKelolaPengaturan = authState.permissions.kelolaPengaturan
+    val bolehKelolaPengguna = authState.permissions.kelolaPengguna
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -222,14 +290,13 @@ private fun AuthenticatedAppShell(
         drawerState = drawerState,
         gesturesEnabled = isShellRoute,
         drawerContent = {
-            // Sidebar Marun Gelap persis `layouts/app.blade.php`
+            // Sidebar Marun Gelap persis `layouts/app.blade.php` dengan teks PUTIH kontras tinggi
             ModalDrawerSheet(
                 drawerContainerColor = ext.maroonDark,
                 drawerContentColor = Color.White,
                 modifier = Modifier.width(292.dp),
             ) {
                 Column(modifier = Modifier.fillMaxHeight()) {
-                    // Header Brand
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -261,7 +328,7 @@ private fun AuthenticatedAppShell(
                         }
                     }
 
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
 
                     Column(
                         modifier = Modifier
@@ -275,7 +342,7 @@ private fun AuthenticatedAppShell(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
                             ),
-                            color = Color.White.copy(alpha = 0.50f),
+                            color = Color.White.copy(alpha = 0.60f),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         )
 
@@ -291,20 +358,21 @@ private fun AuthenticatedAppShell(
                                     Icon(
                                         tab.icon,
                                         contentDescription = null,
-                                        tint = if (selected) ext.goldSoft else Color.White.copy(alpha = 0.7f),
+                                        tint = if (selected) ext.goldSoft else Color.White.copy(alpha = 0.85f),
                                     )
                                 },
                                 label = {
                                     Text(
                                         text = stringResource(tab.labelRes),
+                                        color = Color.White,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                     )
                                 },
                                 colors = NavigationDrawerItemDefaults.colors(
-                                    selectedContainerColor = Color.White.copy(alpha = 0.15f),
+                                    selectedContainerColor = Color.White.copy(alpha = 0.18f),
                                     selectedTextColor = Color.White,
                                     unselectedContainerColor = Color.Transparent,
-                                    unselectedTextColor = Color.White.copy(alpha = 0.85f),
+                                    unselectedTextColor = Color.White,
                                 ),
                             )
                         }
@@ -317,11 +385,10 @@ private fun AuthenticatedAppShell(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp,
                             ),
-                            color = Color.White.copy(alpha = 0.50f),
+                            color = Color.White.copy(alpha = 0.60f),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         )
 
-                        // Owner & DevAdmin: kembali ke Pilih Gedung (persis `properti.lepas` di web)
                         if (isGlobalRole) {
                             NavigationDrawerItem(
                                 selected = false,
@@ -330,21 +397,48 @@ private fun AuthenticatedAppShell(
                                     onReleaseProperti()
                                 },
                                 icon = {
-                                    Icon(
-                                        Icons.Default.Apartment,
-                                        contentDescription = null,
-                                        tint = ext.goldSoft,
+                                    Icon(Icons.Default.Apartment, contentDescription = null, tint = ext.goldSoft)
+                                },
+                                label = {
+                                    Text(
+                                        text = "Kelola / Ganti Gedung",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Medium,
                                     )
                                 },
-                                label = { Text("Ganti / Pilih Gedung", fontWeight = FontWeight.Medium) },
                                 colors = NavigationDrawerItemDefaults.colors(
                                     unselectedContainerColor = Color.Transparent,
-                                    unselectedTextColor = Color.White.copy(alpha = 0.90f),
+                                    unselectedTextColor = Color.White,
                                 ),
                             )
                         }
 
-                        // Pengaturan (Admin/Owner/DevAdmin) atau Akun & Sesi (Penjaga)
+                        if (bolehKelolaPengguna) {
+                            NavigationDrawerItem(
+                                selected = currentRoute == ROUTE_PENGGUNA,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    navController.navigate(ROUTE_PENGGUNA)
+                                },
+                                icon = {
+                                    Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = Color.White.copy(alpha = 0.85f))
+                                },
+                                label = {
+                                    Text(
+                                        text = "Kelola Pengguna",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    selectedContainerColor = Color.White.copy(alpha = 0.18f),
+                                    selectedTextColor = Color.White,
+                                    unselectedContainerColor = Color.Transparent,
+                                    unselectedTextColor = Color.White,
+                                ),
+                            )
+                        }
+
                         val settingSelected = currentRoute == ROUTE_PENGATURAN
                         NavigationDrawerItem(
                             selected = settingSelected,
@@ -356,27 +450,27 @@ private fun AuthenticatedAppShell(
                                 Icon(
                                     imageVector = if (bolehKelolaPengaturan) Icons.Default.Settings else Icons.Default.Person,
                                     contentDescription = null,
-                                    tint = if (settingSelected) ext.goldSoft else Color.White.copy(alpha = 0.7f),
+                                    tint = if (settingSelected) ext.goldSoft else Color.White.copy(alpha = 0.85f),
                                 )
                             },
                             label = {
                                 Text(
                                     text = if (bolehKelolaPengaturan) "Pengaturan & Akun" else "Akun & Sesi",
+                                    color = Color.White,
                                     fontWeight = if (settingSelected) FontWeight.Bold else FontWeight.Medium,
                                 )
                             },
                             colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = Color.White.copy(alpha = 0.15f),
+                                selectedContainerColor = Color.White.copy(alpha = 0.18f),
                                 selectedTextColor = Color.White,
                                 unselectedContainerColor = Color.Transparent,
-                                unselectedTextColor = Color.White.copy(alpha = 0.85f),
+                                unselectedTextColor = Color.White,
                             ),
                         )
                     }
 
-                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
 
-                    // Footer User & Logout
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -408,7 +502,7 @@ private fun AuthenticatedAppShell(
                             Text(
                                 text = authState.user.roleLabel.ifBlank { authState.user.role },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = Color.White.copy(alpha = 0.78f),
                             )
                         }
                         IconButton(
@@ -439,7 +533,7 @@ private fun AuthenticatedAppShell(
                                 Icon(
                                     Icons.Default.Menu,
                                     contentDescription = "Buka menu navigasi",
-                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    tint = Color.White,
                                 )
                             }
                         },
@@ -448,7 +542,7 @@ private fun AuthenticatedAppShell(
                                 Text(
                                     text = pageTitle,
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    color = Color.White,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -464,7 +558,7 @@ private fun AuthenticatedAppShell(
                         actions = {
                             NotificationBellButton(
                                 count = notifications.size,
-                                tint = MaterialTheme.colorScheme.onPrimary,
+                                tint = Color.White,
                                 onClick = {
                                     notifikasiViewModel.refresh()
                                     showNotifDialog = true
@@ -487,7 +581,6 @@ private fun AuthenticatedAppShell(
                 }
             },
             bottomBar = {
-                // Persis `components/bottom-nav.blade.php`: Beranda | Laundry | Penghuni | Laporan | Menu (Drawer)
                 if (isShellRoute && !isWideLayout) {
                     NavigationBar(
                         containerColor = MaterialTheme.colorScheme.surface,
@@ -667,6 +760,17 @@ private fun AuthenticatedAppShell(
                             canSwitchProperti = isGlobalRole,
                             onSwitchProperti = onReleaseProperti,
                             onLogout = { showLogoutConfirm = true },
+                        )
+                    }
+
+                    composable(ROUTE_PENGGUNA) {
+                        val vm: PenggunaViewModel = viewModel(
+                            key = "pengguna_${authState.propertiAktif.id}",
+                            factory = PenggunaViewModel.Factory(repository),
+                        )
+                        PenggunaScreen(
+                            viewModel = vm,
+                            onBack = { navController.popBackStack() },
                         )
                     }
 

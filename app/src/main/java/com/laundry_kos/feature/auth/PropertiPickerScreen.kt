@@ -12,29 +12,41 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.DoorFront
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ManageAccounts
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,6 +54,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,15 +64,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.laundry_kos.core.designsystem.EmptyStateCard
 import com.laundry_kos.core.designsystem.ErrorBannerCard
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
+import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.data.dto.PropertiDto
+import com.laundry_kos.data.dto.SimpanPropertiRequestDto
 import com.laundry_kos.feature.notifikasi.AppNotification
 import com.laundry_kos.feature.notifikasi.NotificationBellButton
 import com.laundry_kos.feature.notifikasi.NotificationListDialog
@@ -71,31 +87,47 @@ fun PropertiPickerScreen(
     uiState: SessionUiState.SelectProperti,
     onSelect: (Int) -> Unit,
     onRefresh: () -> Unit,
+    onTambahProperti: (SimpanPropertiRequestDto, onCreated: (PropertiDto) -> Unit) -> Unit,
+    onUbahProperti: (Int, SimpanPropertiRequestDto, onUpdated: () -> Unit) -> Unit,
+    onOpenSetup: (Int) -> Unit,
+    onOpenPengguna: () -> Unit,
+    onClearSnackbar: () -> Unit,
     onLogout: () -> Unit,
 ) {
     val ext = LaundryKosTheme.extendedColors
     val isWide = rememberIsWideLayout()
-    var showAkunDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    var showTambahDialog by remember { mutableStateOf(false) }
+    var editTarget by remember { mutableStateOf<PropertiDto?>(null) }
     var showNotifDialog by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
-    // Notifikasi global persis AppLayout.php baris 76-97: properti yang masih draf / belum aktif
+    LaunchedEffect(uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            onClearSnackbar()
+        }
+    }
+
+    // Notifikasi global persis AppLayout.php baris 76-97: properti draf / tanpa admin aktif
     val globalNotifications = remember(uiState.propertiList) {
         uiState.propertiList
-            .filter { it.status != "aktif" }
+            .filter { it.status != "aktif" || it.adminAktifNama.isNullOrBlank() }
             .map { prop ->
                 AppNotification(
                     id = "prop_${prop.id}",
                     type = NotificationType.INFO,
                     title = "Lengkapi setup ${prop.nama}",
-                    subtitle = "Status saat ini: ${prop.status}.",
-                    penghuniId = null,
+                    subtitle = if (prop.status != "aktif") "Status saat ini: ${prop.status}." else "Admin aktif belum ditentukan.",
+                    penghuniId = prop.id, // digunakan untuk buka setup properti
                 )
             }
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -117,7 +149,7 @@ fun PropertiPickerScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
-                                text = "Pilih properti untuk dikelola",
+                                text = "Pilih atau kelola properti",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ext.muted,
                             )
@@ -125,26 +157,30 @@ fun PropertiPickerScreen(
                     }
                 },
                 actions = {
+                    Button(
+                        onClick = { showTambahDialog = true },
+                        shape = RoundedCornerShape(999.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Tambah", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                    }
                     NotificationBellButton(
                         count = globalNotifications.size,
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = { showNotifDialog = true },
                     )
-                    IconButton(onClick = { showAkunDialog = true }) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Person,
-                                    contentDescription = "Profil Akun",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                        }
+                    IconButton(onClick = onOpenPengguna) {
+                        Icon(
+                            Icons.Default.ManageAccounts,
+                            contentDescription = "Kelola Pengguna",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
                     IconButton(onClick = { showLogoutConfirm = true }) {
                         Icon(
@@ -173,17 +209,13 @@ fun PropertiPickerScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!uiState.message.isNullOrBlank()) {
-                    item {
-                        ErrorBannerCard(message = uiState.message)
-                    }
+                    item { ErrorBannerCard(message = uiState.message) }
                 }
 
                 if (uiState.isSubmitting) {
                     item {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             horizontalArrangement = Arrangement.Center,
                         ) {
                             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -195,7 +227,7 @@ fun PropertiPickerScreen(
                     item {
                         EmptyStateCard(
                             title = "Belum ada gedung terdaftar",
-                            subtitle = "Tambahkan properti melalui panel web atau hubungi administrator.",
+                            subtitle = "Tekan tombol + Tambah di atas untuk membuat properti pertama.",
                         )
                     }
                 } else if (isWide) {
@@ -208,8 +240,10 @@ fun PropertiPickerScreen(
                             pair.forEach { properti ->
                                 GedungItemCard(
                                     properti = properti,
-                                    enabled = !uiState.isSubmitting && properti.status == "aktif",
+                                    enabled = !uiState.isSubmitting,
                                     onOpen = { onSelect(properti.id) },
+                                    onEdit = { editTarget = properti },
+                                    onSetup = { onOpenSetup(properti.id) },
                                     modifier = Modifier.weight(1f),
                                 )
                             }
@@ -220,8 +254,10 @@ fun PropertiPickerScreen(
                     items(uiState.propertiList, key = { it.id }) { properti ->
                         GedungItemCard(
                             properti = properti,
-                            enabled = !uiState.isSubmitting && properti.status == "aktif",
+                            enabled = !uiState.isSubmitting,
                             onOpen = { onSelect(properti.id) },
+                            onEdit = { editTarget = properti },
+                            onSetup = { onOpenSetup(properti.id) },
                         )
                     }
                 }
@@ -229,38 +265,49 @@ fun PropertiPickerScreen(
         }
     }
 
-    if (showNotifDialog) {
-        NotificationListDialog(
-            notifications = globalNotifications,
-            emptyMessage = "Semua properti sudah aktif dan siap dikelola.",
-            onItemClick = { showNotifDialog = false },
-            onSeeAllPenghuni = null,
-            onDismiss = { showNotifDialog = false },
+    // Modal Tambah Properti Baru (persis `properti/index.blade.php`)
+    if (showTambahDialog) {
+        PropertiFormDialog(
+            title = "Tambah Properti Baru",
+            initial = null,
+            submitting = uiState.isSubmitting,
+            onDismiss = { showTambahDialog = false },
+            onSubmit = { req ->
+                onTambahProperti(req) { created ->
+                    showTambahDialog = false
+                    if (created.status == "draf") {
+                        onOpenSetup(created.id)
+                    }
+                }
+            },
         )
     }
 
-    if (showAkunDialog) {
-        AlertDialog(
-            onDismissRequest = { showAkunDialog = false },
-            title = { Text("Akun Aktif") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(uiState.user.name, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "@${uiState.user.username} · ${uiState.user.roleLabel.ifBlank { uiState.user.role }}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ext.muted,
-                    )
-                    Text(
-                        text = "Total akses gedung: ${uiState.propertiList.size}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ext.muted,
-                    )
+    // Modal Edit Properti (persis `/properti/{id}/edit`)
+    editTarget?.let { prop ->
+        PropertiFormDialog(
+            title = "Edit Properti",
+            initial = prop,
+            submitting = uiState.isSubmitting,
+            onDismiss = { editTarget = null },
+            onSubmit = { req ->
+                onUbahProperti(prop.id, req) {
+                    editTarget = null
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showAkunDialog = false }) { Text("Tutup") }
+        )
+    }
+
+    if (showNotifDialog) {
+        NotificationListDialog(
+            notifications = globalNotifications,
+            emptyMessage = "Semua properti sudah aktif dan memiliki admin.",
+            onItemClick = { notif ->
+                showNotifDialog = false
+                notif.penghuniId?.let(onOpenSetup)
             },
+            onSeeAllPenghuni = null,
+            onDismiss = { showNotifDialog = false },
         )
     }
 
@@ -275,9 +322,7 @@ fun PropertiPickerScreen(
                         showLogoutConfirm = false
                         onLogout()
                     },
-                ) {
-                    Text("Ya, Keluar", color = ext.danger)
-                }
+                ) { Text("Ya, Keluar", color = ext.danger) }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutConfirm = false }) { Text("Batal") }
@@ -291,18 +336,20 @@ private fun GedungItemCard(
     properti: PropertiDto,
     enabled: Boolean,
     onOpen: () -> Unit,
+    onEdit: () -> Unit,
+    onSetup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val ext = LaundryKosTheme.extendedColors
     val isAktif = properti.status == "aktif"
     val (statusBg, statusFg, statusText) = when (properti.status) {
-        "aktif" -> Triple(ext.ok, Color.White, "Aktif")
+        "aktif" -> Triple(ext.okContainer, ext.ok, "Aktif")
         "draf" -> Triple(ext.goldContainer, ext.onGold, "Draf")
         else -> Triple(ext.sunken, ext.muted, properti.status.replaceFirstChar { it.uppercase() })
     }
 
     LaundryCard(
-        modifier = modifier.clickable(enabled = enabled, onClick = onOpen),
+        modifier = modifier,
         contentPadding = PaddingValues(14.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -312,9 +359,9 @@ private fun GedungItemCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(46.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
@@ -358,41 +405,49 @@ private fun GedungItemCard(
                         overflow = TextOverflow.Ellipsis,
                     )
 
-                    if (properti.jumlahKamar != null || properti.jumlahPenghuniAktif != null) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 2.dp),
-                        ) {
-                            properti.jumlahKamar?.let { kamar ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Icon(Icons.Default.DoorFront, contentDescription = null, tint = ext.subtle, modifier = Modifier.size(14.dp))
-                                    Text("$kamar kamar", style = MaterialTheme.typography.labelSmall, color = ext.muted)
-                                }
-                            }
-                            properti.jumlahPenghuniAktif?.let { penghuni ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Icon(Icons.Default.Groups, contentDescription = null, tint = ext.subtle, modifier = Modifier.size(14.dp))
-                                    Text("$penghuni penghuni aktif", style = MaterialTheme.typography.labelSmall, color = ext.muted)
-                                }
-                            }
+                    // 3 metadata persis Gambar 2 web: kamar, penghuni, admin aktif
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 3.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Default.DoorFront, contentDescription = null, tint = ext.subtle, modifier = Modifier.size(14.dp))
+                            Text("${properti.jumlahKamar ?: 0} kamar", style = MaterialTheme.typography.labelSmall, color = ext.muted)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Default.Groups, contentDescription = null, tint = ext.subtle, modifier = Modifier.size(14.dp))
+                            Text("${properti.jumlahPenghuniAktif ?: 0} penghuni", style = MaterialTheme.typography.labelSmall, color = ext.muted)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = ext.subtle, modifier = Modifier.size(14.dp))
+                            Text(
+                                text = properti.adminAktifNama?.takeIf { it.isNotBlank() } ?: "Belum ada admin",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ext.muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
             }
 
-            if (isAktif) {
+            HorizontalDivider(color = ext.line)
+
+            // Baris Aksi Persis Gambar 2 Web: [→ Buka Properti] [✏️ Edit] [🎛️ Setup]
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Button(
                     onClick = onOpen,
-                    enabled = enabled,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
+                    enabled = enabled && isAktif,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.White,
@@ -400,23 +455,145 @@ private fun GedungItemCard(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Buka Properti", style = MaterialTheme.typography.labelLarge)
-                }
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = ext.sunken,
-                    border = BorderStroke(1.dp, ext.line),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
                     Text(
-                        text = "Properti berstatus ${properti.status} — selesaikan aktivasi di panel web untuk membuka operasional.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ext.muted,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        text = if (isAktif) "Buka Properti" else "Belum Aktif (${properti.status})",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                     )
+                }
+
+                if (properti.bolehUbah) {
+                    OutlinedIconButton(
+                        onClick = onEdit,
+                        enabled = enabled,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, ext.lineStrong),
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit Properti",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+
+                    OutlinedIconButton(
+                        onClick = onSetup,
+                        enabled = enabled,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, ext.lineStrong),
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = "Setup Properti",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PropertiFormDialog(
+    title: String,
+    initial: PropertiDto?,
+    submitting: Boolean,
+    onDismiss: () -> Unit,
+    onSubmit: (SimpanPropertiRequestDto) -> Unit,
+) {
+    var nama by remember { mutableStateOf(initial?.nama ?: "") }
+    var namaLaporan by remember { mutableStateOf(initial?.namaPropertiLaporan ?: initial?.nama ?: "") }
+    var alamat by remember { mutableStateOf(initial?.alamat ?: "") }
+    var noWaAdmin by remember { mutableStateOf(initial?.noWaAdmin ?: "") }
+    var deskripsi by remember { mutableStateOf(initial?.deskripsi ?: "") }
+    var status by remember { mutableStateOf(initial?.status ?: "draf") }
+
+    AlertDialog(
+        onDismissRequest = { if (!submitting) onDismiss() },
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = nama,
+                    onValueChange = {
+                        nama = it
+                        if (initial == null && namaLaporan.isBlank()) namaLaporan = it
+                    },
+                    label = { Text("Nama Properti *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = namaLaporan,
+                    onValueChange = { namaLaporan = it },
+                    label = { Text("Nama Properti di Laporan *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = alamat,
+                    onValueChange = { alamat = it },
+                    label = { Text("Alamat") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = noWaAdmin,
+                    onValueChange = { noWaAdmin = it },
+                    label = { Text("No WhatsApp Admin") },
+                    placeholder = { Text("Contoh: 628xxxx") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = deskripsi,
+                    onValueChange = { deskripsi = it },
+                    label = { Text("Deskripsi (opsional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Status Properti", style = MaterialTheme.typography.labelMedium, color = LaundryKosTheme.extendedColors.muted)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("draf" to "Draf", "aktif" to "Aktif", "arsip" to "Arsip").forEach { (key, label) ->
+                        FilterChip(
+                            selected = status == key,
+                            onClick = { status = key },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !submitting && nama.isNotBlank(),
+                onClick = {
+                    val namaFinal = nama.trim()
+                    onSubmit(
+                        SimpanPropertiRequestDto(
+                            nama = namaFinal,
+                            namaPropertiLaporan = namaLaporan.trim().ifBlank { namaFinal },
+                            alamat = alamat.trim().takeIf { it.isNotEmpty() },
+                            noWaAdmin = noWaAdmin.trim().takeIf { it.isNotEmpty() },
+                            deskripsi = deskripsi.trim().takeIf { it.isNotEmpty() },
+                            status = status,
+                        ),
+                    )
+                },
+            ) { Text(if (submitting) "Menyimpan..." else "Simpan") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !submitting) { Text("Batal") }
+        },
+    )
 }

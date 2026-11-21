@@ -48,6 +48,7 @@ import com.laundry_kos.core.designsystem.DatePickerField
 import com.laundry_kos.core.designsystem.ErrorBannerCard
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
+import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.MaroonPrimaryButton
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.data.dto.PropertiDto
@@ -79,7 +80,7 @@ fun PengaturanScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(
             modifier = Modifier

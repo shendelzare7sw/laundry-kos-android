@@ -28,9 +28,13 @@ data class PropertiDto(
     val nama: String,
     @SerialName("nama_properti_laporan") val namaPropertiLaporan: String? = null,
     val alamat: String? = null,
+    @SerialName("no_wa_admin") val noWaAdmin: String? = null,
+    val deskripsi: String? = null,
     val status: String = "aktif",
     @SerialName("jumlah_kamar") val jumlahKamar: Int? = null,
     @SerialName("jumlah_penghuni_aktif") val jumlahPenghuniAktif: Int? = null,
+    @SerialName("admin_aktif_nama") val adminAktifNama: String? = null,
+    @SerialName("boleh_ubah") val bolehUbah: Boolean = false,
 )
 
 @Serializable
@@ -65,6 +69,7 @@ data class MeResponseDto(
 
 @Serializable
 data class PropertiListResponseDto(
+    @SerialName("boleh_tambah") val bolehTambah: Boolean = false,
     val data: List<PropertiDto> = emptyList(),
 )
 

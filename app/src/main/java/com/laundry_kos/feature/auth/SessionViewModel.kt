@@ -8,11 +8,13 @@ import com.laundry_kos.core.network.ApiResult
 import com.laundry_kos.core.network.GlobalApiEvent
 import com.laundry_kos.data.dto.PermissionsDto
 import com.laundry_kos.data.dto.PropertiDto
+import com.laundry_kos.data.dto.SimpanPropertiRequestDto
 import com.laundry_kos.data.dto.UserDto
 import com.laundry_kos.data.repository.LaundryKosRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface SessionUiState {
@@ -28,6 +30,7 @@ sealed interface SessionUiState {
         val user: UserDto,
         val propertiList: List<PropertiDto>,
         val message: String? = null,
+        val snackbarMessage: String? = null,
         val isSubmitting: Boolean = false,
         val isRefreshing: Boolean = false,
     ) : SessionUiState
@@ -158,24 +161,98 @@ class SessionViewModel(
     }
 
     fun refreshPropertiList() {
-        val current = _state.value as? SessionUiState.SelectProperti ?: return
+        if (_state.value !is SessionUiState.SelectProperti) return
         viewModelScope.launch {
-            _state.value = current.copy(isRefreshing = true, message = null)
+            _state.update { s ->
+                if (s is SessionUiState.SelectProperti) s.copy(isRefreshing = true, message = null) else s
+            }
             when (val res = repository.fetchProperti()) {
-                is ApiResult.Success -> {
-                    _state.value = current.copy(
-                        propertiList = res.data.data,
-                        isRefreshing = false,
-                        message = null,
-                    )
+                is ApiResult.Success -> _state.update { s ->
+                    if (s is SessionUiState.SelectProperti) {
+                        s.copy(propertiList = res.data.data, isRefreshing = false, message = null)
+                    } else {
+                        s
+                    }
                 }
-                is ApiResult.Failure -> {
-                    _state.value = current.copy(
-                        isRefreshing = false,
-                        message = res.error.summaryMessage(),
-                    )
+                is ApiResult.Failure -> _state.update { s ->
+                    if (s is SessionUiState.SelectProperti) {
+                        s.copy(isRefreshing = false, message = res.error.summaryMessage())
+                    } else {
+                        s
+                    }
                 }
             }
+        }
+    }
+
+    fun tambahProperti(
+        request: SimpanPropertiRequestDto,
+        onCreated: (PropertiDto) -> Unit,
+    ) {
+        if (_state.value !is SessionUiState.SelectProperti) return
+        viewModelScope.launch {
+            _state.update { s ->
+                if (s is SessionUiState.SelectProperti) s.copy(isSubmitting = true, message = null) else s
+            }
+            when (val res = repository.tambahProperti(request)) {
+                is ApiResult.Success -> {
+                    _state.update { s ->
+                        if (s is SessionUiState.SelectProperti) {
+                            s.copy(isSubmitting = false, snackbarMessage = res.data.message)
+                        } else {
+                            s
+                        }
+                    }
+                    refreshPropertiList()
+                    onCreated(res.data.data)
+                }
+                is ApiResult.Failure -> _state.update { s ->
+                    if (s is SessionUiState.SelectProperti) {
+                        s.copy(isSubmitting = false, snackbarMessage = res.error.summaryMessage())
+                    } else {
+                        s
+                    }
+                }
+            }
+        }
+    }
+
+    fun ubahProperti(
+        propertiId: Int,
+        request: SimpanPropertiRequestDto,
+        onUpdated: () -> Unit,
+    ) {
+        if (_state.value !is SessionUiState.SelectProperti) return
+        viewModelScope.launch {
+            _state.update { s ->
+                if (s is SessionUiState.SelectProperti) s.copy(isSubmitting = true, message = null) else s
+            }
+            when (val res = repository.ubahProperti(propertiId, request)) {
+                is ApiResult.Success -> {
+                    _state.update { s ->
+                        if (s is SessionUiState.SelectProperti) {
+                            s.copy(isSubmitting = false, snackbarMessage = res.data.message)
+                        } else {
+                            s
+                        }
+                    }
+                    onUpdated()
+                    refreshPropertiList()
+                }
+                is ApiResult.Failure -> _state.update { s ->
+                    if (s is SessionUiState.SelectProperti) {
+                        s.copy(isSubmitting = false, snackbarMessage = res.error.summaryMessage())
+                    } else {
+                        s
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearSelectPropertiSnackbar() {
+        _state.update { s ->
+            if (s is SessionUiState.SelectProperti) s.copy(snackbarMessage = null) else s
         }
     }
 

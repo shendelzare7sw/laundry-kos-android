@@ -57,6 +57,7 @@ import com.laundry_kos.core.designsystem.KuotaProgressBar
 import com.laundry_kos.core.designsystem.KuotaVisualStatus
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
+import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.MonthSelectorBar
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
@@ -97,7 +98,7 @@ fun PenghuniListScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (bolehTambah) {
                 FloatingActionButton(

@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -44,7 +45,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -61,9 +61,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +80,7 @@ import com.laundry_kos.core.designsystem.EmptyStateCard
 import com.laundry_kos.core.designsystem.ErrorBannerCard
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
+import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.core.util.LaporanPdfPrinter
@@ -116,7 +120,7 @@ fun LaporanScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { LaundrySnackbarHost(snackbarHostState) },
         bottomBar = {
             if (laporan != null) {
                 Surface(
@@ -634,6 +638,8 @@ private fun LaporanPenghuniDetailCard(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         if (isEditing) {
+                            val keyboardController = LocalSoftwareKeyboardController.current
+                            val focusManager = LocalFocusManager.current
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -662,6 +668,8 @@ private fun LaporanPenghuniDetailCard(
                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                             color = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.clickable(enabled = !inlineSaving) {
+                                                keyboardController?.hide()
+                                                focusManager.clearFocus()
                                                 onSaveInline(true)
                                             },
                                         )
@@ -678,20 +686,43 @@ private fun LaporanPenghuniDetailCard(
                                         onValueChange = onInlineNominalChange,
                                         prefix = { Text("Rp ", fontWeight = FontWeight.Bold, color = ext.danger) },
                                         singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Number,
+                                            imeAction = ImeAction.Done,
+                                        ),
+                                        keyboardActions = KeyboardActions(
+                                            onDone = {
+                                                if (!inlineSaving && inlineNominal.toIntOrNull() != null) {
+                                                    keyboardController?.hide()
+                                                    focusManager.clearFocus()
+                                                    onSaveInline(false)
+                                                }
+                                            },
+                                        ),
                                         modifier = Modifier.weight(1f),
                                     )
                                     Button(
-                                        onClick = { onSaveInline(false) },
+                                        onClick = {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                            onSaveInline(false)
+                                        },
                                         enabled = !inlineSaving && inlineNominal.toIntOrNull() != null,
                                         shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = ext.danger),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = ext.danger,
+                                            contentColor = Color.White,
+                                        ),
                                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                                     ) {
-                                        Text("OK", fontWeight = FontWeight.Bold)
+                                        Text(if (inlineSaving) "..." else "OK", fontWeight = FontWeight.Bold)
                                     }
                                     IconButton(
-                                        onClick = onCancelInline,
+                                        onClick = {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                            onCancelInline()
+                                        },
                                         enabled = !inlineSaving,
                                     ) {
                                         Icon(Icons.Default.Close, contentDescription = "Batal", tint = ext.danger)

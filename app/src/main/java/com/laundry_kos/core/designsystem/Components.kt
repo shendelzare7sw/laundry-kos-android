@@ -14,13 +14,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -212,6 +219,52 @@ fun ErrorBannerCard(
                 ) {
                     Text(stringResource(R.string.aksi_coba_lagi))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun LaundrySnackbarHost(
+    hostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+) {
+    val ext = LaundryKosTheme.extendedColors
+    SnackbarHost(
+        hostState = hostState,
+        modifier = modifier,
+    ) { data ->
+        val msg = data.visuals.message
+        val isError = msg.contains("gagal", ignoreCase = true) ||
+            msg.contains("salah", ignoreCase = true) ||
+            msg.contains("tidak", ignoreCase = true) ||
+            msg.contains("galat", ignoreCase = true) ||
+            msg.contains("belum", ignoreCase = true)
+        val containerColor = if (isError) ext.danger else ext.maroonDark
+        val icon = if (isError) Icons.Default.ErrorOutline else Icons.Default.CheckCircle
+        val iconTint = if (isError) Color.White else ext.goldSoft
+
+        Snackbar(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(14.dp),
+            containerColor = containerColor,
+            contentColor = Color.White,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = Color.White,
+                )
             }
         }
     }
