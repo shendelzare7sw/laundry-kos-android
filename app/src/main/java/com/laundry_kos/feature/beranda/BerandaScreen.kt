@@ -46,6 +46,7 @@ import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.MaroonPrimaryButton
 import com.laundry_kos.core.designsystem.MonthSelectorBar
 import com.laundry_kos.core.designsystem.StatusBadge
+import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.core.util.WhatsAppIntent
 import com.laundry_kos.data.dto.PeringatanKuotaItemDto
@@ -61,6 +62,7 @@ fun BerandaScreen(
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val ext = LaundryKosTheme.extendedColors
+    val isWide = rememberIsWideLayout()
     val context = LocalContext.current
 
     PullToRefreshBox(
@@ -120,7 +122,7 @@ fun BerandaScreen(
             if (data != null) {
                 val r = data.ringkasan
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (isWide) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -135,11 +137,6 @@ fun BerandaScreen(
                                 value = "${r.jumlahPenghuniMencatat} orang",
                                 modifier = Modifier.weight(1f),
                             )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
                             KpiMetricCard(
                                 label = "Total Biaya Utama",
                                 value = Formatters.formatRupiah(r.totalBiayaUtama),
@@ -152,6 +149,41 @@ fun BerandaScreen(
                                 containerColor = ext.goldContainer,
                                 modifier = Modifier.weight(1f),
                             )
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                KpiMetricCard(
+                                    label = "Total Berat",
+                                    value = Formatters.formatBeratKg(r.totalBeratCenti, r.totalBeratLabel),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                KpiMetricCard(
+                                    label = "Penghuni Mencatat",
+                                    value = "${r.jumlahPenghuniMencatat} orang",
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                KpiMetricCard(
+                                    label = "Total Biaya Utama",
+                                    value = Formatters.formatRupiah(r.totalBiayaUtama),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                KpiMetricCard(
+                                    label = "Bayar Terpisah",
+                                    value = Formatters.formatRupiah(r.totalBayarTerpisah),
+                                    valueColor = ext.onGold,
+                                    containerColor = ext.goldContainer,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
                         }
                     }
                 }
@@ -195,18 +227,45 @@ fun BerandaScreen(
                         )
                     }
                 } else {
-                    items(data.daftarPeringatan, key = { it.penghuniId }) { item ->
-                        PeringatanKuotaCard(
-                            item = item,
-                            onClick = { onOpenPenghuniDetail(item.penghuniId) },
-                            onSendWa = {
-                                WhatsAppIntent.openUrlOrCopy(
-                                    context = context,
-                                    url = item.waUrl,
-                                    label = "Peringatan Kuota ${item.nama}",
-                                )
-                            },
-                        )
+                    if (isWide) {
+                        items(data.daftarPeringatan.chunked(2)) { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                pair.forEach { item ->
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        PeringatanKuotaCard(
+                                            item = item,
+                                            onClick = { onOpenPenghuniDetail(item.penghuniId) },
+                                            onSendWa = {
+                                                WhatsAppIntent.openUrlOrCopy(
+                                                    context = context,
+                                                    url = item.waUrl,
+                                                    label = "Peringatan Kuota ${item.nama}",
+                                                )
+                                            },
+                                        )
+                                    }
+                                }
+                                if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        items(data.daftarPeringatan, key = { it.penghuniId }) { item ->
+                            PeringatanKuotaCard(
+                                item = item,
+                                onClick = { onOpenPenghuniDetail(item.penghuniId) },
+                                onSendWa = {
+                                    WhatsAppIntent.openUrlOrCopy(
+                                        context = context,
+                                        url = item.waUrl,
+                                        label = "Peringatan Kuota ${item.nama}",
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
             }

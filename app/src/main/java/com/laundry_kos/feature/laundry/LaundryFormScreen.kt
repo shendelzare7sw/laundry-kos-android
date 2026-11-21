@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -120,10 +121,16 @@ fun LaundryFormScreen(
             return@Scaffold
         }
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 720.dp)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
@@ -468,6 +475,7 @@ fun LaundryFormScreen(
                 onClick = viewModel::submit,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
         }
     }
 

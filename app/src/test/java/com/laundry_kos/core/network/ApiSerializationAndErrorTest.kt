@@ -131,8 +131,12 @@ class ApiSerializationAndErrorTest {
         val laporan = json.decodeFromString<LaporanResponse>(laporanJson)
         assertEquals("307→310", laporan.kartuPenghuni.first().labelKamar)
         val html = LaporanPdfPrinter.buildPrintHtml(laporan)
+        assertTrue(html.contains("TOTAL LAUNDRY"))
+        assertTrue(html.contains("JUMLAH PENGHUNI"))
+        assertTrue(html.contains("MENDEKATI / LEWAT"))
         assertTrue(html.contains("307→310"))
-        assertTrue(html.contains("class='merah'"))
+        assertTrue(html.contains("entry-row merah"))
+        assertTrue(html.contains("Subtotal semua"))
         assertTrue(html.contains("Rp30.000"))
     }
 }

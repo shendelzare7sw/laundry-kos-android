@@ -5,14 +5,15 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -56,223 +57,229 @@ private val PEMBULATAN_OPTIONS = listOf(1, 100, 500, 1000, 5000)
 
 @Composable
 fun PengaturanScreen(
-    viewModel: PengaturanViewModel,
+    viewModel: PengaturanViewModel?,
     user: UserDto,
     propertiAktif: PropertiDto,
+    bolehKelolaPengaturan: Boolean,
     canSwitchProperti: Boolean,
     onSwitchProperti: () -> Unit,
     onLogout: () -> Unit,
 ) {
-    val uiState by viewModel.state.collectAsStateWithLifecycle()
     val ext = LaundryKosTheme.extendedColors
     val snackbarHostState = remember { SnackbarHostState() }
+    val uiState = viewModel?.state?.collectAsStateWithLifecycle()?.value
 
-    LaunchedEffect(uiState.snackbarMessage) {
-        uiState.snackbarMessage?.let {
+    LaunchedEffect(uiState?.snackbarMessage) {
+        uiState?.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
-            viewModel.clearSnackbar()
+            viewModel?.clearSnackbar()
         }
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            // Kartu Akun & Properti Aktif
-            LaundryCard(containerColor = ext.surfaceAlt) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(user.name, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = "@${user.username} · ${user.roleLabel.ifBlank { user.role }}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ext.muted,
-                            )
-                        }
-                        StatusBadge(
-                            text = propertiAktif.nama,
-                            containerColor = ext.goldContainer,
-                            contentColor = ext.onGold,
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (canSwitchProperti) {
-                            OutlinedButton(
-                                onClick = onSwitchProperti,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                            ) {
-                                Icon(Icons.Default.Apartment, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ganti Properti")
-                            }
-                        }
-                        OutlinedButton(
-                            onClick = onLogout,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, ext.danger),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ext.danger),
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Keluar")
-                        }
-                    }
-                }
-            }
-
-            if (uiState.error != null) {
-                ErrorBannerCard(message = uiState.error!!, onRetry = { viewModel.load() })
-            }
-
-            if (uiState.loading) {
-                Box(modifier = Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            } else {
-                val editable = uiState.bolehUbah
-
-                if (!editable) {
-                    LaundryCard(containerColor = ext.goldContainer) {
-                        Text(
-                            text = "Akun Anda hanya dapat melihat pengaturan aktif. Perubahan aturan hanya untuk Admin / Owner.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ext.onGold,
-                        )
-                    }
-                }
-
-                // 1. Aturan Tarif & Kuota Berversi
-                LaundryCard {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 720.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Kartu Akun & Sesi (Selalu tampil untuk semua role)
+                LaundryCard(containerColor = ext.surfaceAlt) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Aturan Tarif & Kuota Berversi", style = MaterialTheme.typography.titleSmall)
-
-                        DatePickerField(
-                            label = "Lihat Aturan Aktif Pada Tanggal",
-                            valueIso = uiState.tanggalAcuan,
-                            onValueSelected = { viewModel.load(it) },
+                        Text(
+                            text = "Akun & Sesi",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
                         )
-
-                        OutlinedTextField(
-                            value = uiState.namaProperti,
-                            onValueChange = { v -> viewModel.updateState { it.copy(namaProperti = v) } },
-                            enabled = editable,
-                            label = { Text("Nama Properti pada Laporan") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = uiState.tarifPerKg,
-                                onValueChange = { v -> viewModel.updateState { it.copy(tarifPerKg = v.filter(Char::isDigit)) } },
-                                enabled = editable,
-                                label = { Text("Tarif / kg (Rp)") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = uiState.minKg,
-                                onValueChange = { v -> viewModel.updateState { it.copy(minKg = v) } },
-                                enabled = editable,
-                                label = { Text("Min Berat (kg)") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = uiState.kuotaKg,
-                                onValueChange = { v -> viewModel.updateState { it.copy(kuotaKg = v) } },
-                                enabled = editable,
-                                label = { Text("Kuota Gratis (kg)") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                value = uiState.toleransiKg,
-                                onValueChange = { v -> viewModel.updateState { it.copy(toleransiKg = v) } },
-                                enabled = editable,
-                                label = { Text("Toleransi (kg)") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-
-                        OutlinedTextField(
-                            value = uiState.ambangPersen,
-                            onValueChange = { v -> viewModel.updateState { it.copy(ambangPersen = v.filter(Char::isDigit)) } },
-                            enabled = editable,
-                            label = { Text("Ambang Mendekati Kuota (%)") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-
-                        Text("Mode Kuota", style = MaterialTheme.typography.labelMedium, color = ext.muted)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = uiState.modeKuota == "penghuni",
-                                onClick = { if (editable) viewModel.updateState { it.copy(modeKuota = "penghuni") } },
-                                label = { Text("Per Penghuni") },
-                            )
-                            FilterChip(
-                                selected = uiState.modeKuota == "tanpa_kuota",
-                                onClick = { if (editable) viewModel.updateState { it.copy(modeKuota = "tanpa_kuota") } },
-                                label = { Text("Tanpa Kuota") },
-                            )
-                        }
-
-                        Text("Pembulatan Tagihan Lewat Kuota (Rp)", style = MaterialTheme.typography.labelMedium, color = ext.muted)
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            PEMBULATAN_OPTIONS.forEach { nominal ->
-                                FilterChip(
-                                    selected = uiState.pembulatan == nominal,
-                                    onClick = { if (editable) viewModel.updateState { it.copy(pembulatan = nominal) } },
-                                    label = { Text("Rp$nominal") },
-                                )
-                            }
-                        }
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Kuota prorata bulan masuk", style = MaterialTheme.typography.bodyMedium)
-                            Switch(
-                                checked = uiState.kuotaProrata,
-                                enabled = editable,
-                                onCheckedChange = { checked -> viewModel.updateState { it.copy(kuotaProrata = checked) } },
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(user.name, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    text = "@${user.username} · ${user.roleLabel.ifBlank { user.role }}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ext.muted,
+                                )
+                            }
+                            StatusBadge(
+                                text = propertiAktif.nama,
+                                containerColor = ext.goldContainer,
+                                contentColor = ext.onGold,
                             )
                         }
+                        if (!propertiAktif.alamat.isNullOrBlank()) {
+                            Text(
+                                text = propertiAktif.alamat,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ext.muted,
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (canSwitchProperti) {
+                                OutlinedButton(
+                                    onClick = onSwitchProperti,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                ) {
+                                    Icon(Icons.Default.Apartment, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Ganti Properti")
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = onLogout,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, ext.danger),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = ext.danger),
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Keluar")
+                            }
+                        }
+                    }
+                }
 
-                        if (editable) {
+                // Pengaturan Properti HANYA tampil untuk role yang berwenang (admin / owner / dev_admin).
+                // Role penjaga tidak ditampilkan form aturan, izin penjaga, maupun template WA.
+                if (!bolehKelolaPengaturan || viewModel == null || uiState == null) {
+                    return@Column
+                }
+
+                if (uiState.error != null) {
+                    ErrorBannerCard(message = uiState.error, onRetry = { viewModel.load() })
+                }
+
+                if (uiState.loading) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (uiState.bolehUbah) {
+                    // 1. Aturan Tarif & Kuota Berversi
+                    LaundryCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Aturan Tarif & Kuota Berversi", style = MaterialTheme.typography.titleSmall)
+
+                            DatePickerField(
+                                label = "Lihat Aturan Aktif Pada Tanggal",
+                                valueIso = uiState.tanggalAcuan,
+                                onValueSelected = { viewModel.load(it) },
+                            )
+
+                            OutlinedTextField(
+                                value = uiState.namaProperti,
+                                onValueChange = { v -> viewModel.updateState { it.copy(namaProperti = v) } },
+                                label = { Text("Nama Properti pada Laporan") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = uiState.tarifPerKg,
+                                    onValueChange = { v -> viewModel.updateState { it.copy(tarifPerKg = v.filter(Char::isDigit)) } },
+                                    label = { Text("Tarif / kg (Rp)") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = uiState.minKg,
+                                    onValueChange = { v -> viewModel.updateState { it.copy(minKg = v) } },
+                                    label = { Text("Min Berat (kg)") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = uiState.kuotaKg,
+                                    onValueChange = { v -> viewModel.updateState { it.copy(kuotaKg = v) } },
+                                    label = { Text("Kuota Gratis (kg)") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = uiState.toleransiKg,
+                                    onValueChange = { v -> viewModel.updateState { it.copy(toleransiKg = v) } },
+                                    label = { Text("Toleransi (kg)") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = uiState.ambangPersen,
+                                onValueChange = { v -> viewModel.updateState { it.copy(ambangPersen = v.filter(Char::isDigit)) } },
+                                label = { Text("Ambang Mendekati Kuota (%)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+
+                            Text("Mode Kuota", style = MaterialTheme.typography.labelMedium, color = ext.muted)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = uiState.modeKuota == "penghuni",
+                                    onClick = { viewModel.updateState { it.copy(modeKuota = "penghuni") } },
+                                    label = { Text("Per Penghuni") },
+                                )
+                                FilterChip(
+                                    selected = uiState.modeKuota == "tanpa_kuota",
+                                    onClick = { viewModel.updateState { it.copy(modeKuota = "tanpa_kuota") } },
+                                    label = { Text("Tanpa Kuota") },
+                                )
+                            }
+
+                            Text("Pembulatan Tagihan Lewat Kuota (Rp)", style = MaterialTheme.typography.labelMedium, color = ext.muted)
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                PEMBULATAN_OPTIONS.forEach { nominal ->
+                                    FilterChip(
+                                        selected = uiState.pembulatan == nominal,
+                                        onClick = { viewModel.updateState { it.copy(pembulatan = nominal) } },
+                                        label = { Text("Rp$nominal") },
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("Kuota prorata bulan masuk", style = MaterialTheme.typography.bodyMedium)
+                                Switch(
+                                    checked = uiState.kuotaProrata,
+                                    onCheckedChange = { checked -> viewModel.updateState { it.copy(kuotaProrata = checked) } },
+                                )
+                            }
+
                             DatePickerField(
                                 label = "Berlaku Mulai Tanggal",
                                 valueIso = uiState.berlakuMulai,
@@ -286,46 +293,41 @@ fun PengaturanScreen(
                             )
                         }
                     }
-                }
 
-                // 2. Izin Penjaga
-                LaundryCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Izin & Batas Edit Penjaga", style = MaterialTheme.typography.titleSmall)
-                        OutlinedTextField(
-                            value = uiState.jamEditPenjaga,
-                            onValueChange = { v -> viewModel.updateState { it.copy(jamEditPenjaga = v.filter(Char::isDigit)) } },
-                            enabled = editable,
-                            label = { Text("Batas Jam Edit Penjaga (kosongkan = tanpa batas)") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("Penjaga boleh kelola kontrak penghuni", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = uiState.penjagaKelolaKontrak,
-                                enabled = editable,
-                                onCheckedChange = { c -> viewModel.updateState { it.copy(penjagaKelolaKontrak = c) } },
+                    // 2. Izin Penjaga
+                    LaundryCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Izin & Batas Edit Penjaga", style = MaterialTheme.typography.titleSmall)
+                            OutlinedTextField(
+                                value = uiState.jamEditPenjaga,
+                                onValueChange = { v -> viewModel.updateState { it.copy(jamEditPenjaga = v.filter(Char::isDigit)) } },
+                                label = { Text("Batas Jam Edit Penjaga (kosongkan = tanpa batas)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
                             )
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("Penjaga boleh ubah catatan staf lain", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = uiState.penjagaUbahCatatanLain,
-                                enabled = editable,
-                                onCheckedChange = { c -> viewModel.updateState { it.copy(penjagaUbahCatatanLain = c) } },
-                            )
-                        }
-                        if (editable) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("Penjaga boleh kelola kontrak penghuni", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                Switch(
+                                    checked = uiState.penjagaKelolaKontrak,
+                                    onCheckedChange = { c -> viewModel.updateState { it.copy(penjagaKelolaKontrak = c) } },
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("Penjaga boleh ubah catatan staf lain", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                Switch(
+                                    checked = uiState.penjagaUbahCatatanLain,
+                                    onCheckedChange = { c -> viewModel.updateState { it.copy(penjagaUbahCatatanLain = c) } },
+                                )
+                            }
                             MaroonPrimaryButton(
                                 text = "Simpan Izin Penjaga",
                                 loading = uiState.saving,
@@ -334,55 +336,48 @@ fun PengaturanScreen(
                             )
                         }
                     }
-                }
 
-                // 3. Template Pesan WhatsApp
-                LaundryCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("Template Pesan WhatsApp", style = MaterialTheme.typography.titleSmall)
-                            if (editable) {
+                    // 3. Template Pesan WhatsApp
+                    LaundryCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("Template Pesan WhatsApp", style = MaterialTheme.typography.titleSmall)
                                 TextButton(onClick = { viewModel.resetTemplateWa(null) }) {
                                     Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Reset Semua")
                                 }
                             }
-                        }
 
-                        OutlinedTextField(
-                            value = uiState.templateWaTagihan,
-                            onValueChange = { v -> viewModel.updateState { it.copy(templateWaTagihan = v) } },
-                            enabled = editable,
-                            label = { Text("Template WA Tagihan") },
-                            minLines = 3,
-                            maxLines = 6,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
-                            value = uiState.templateWaPeringatan,
-                            onValueChange = { v -> viewModel.updateState { it.copy(templateWaPeringatan = v) } },
-                            enabled = editable,
-                            label = { Text("Template WA Peringatan Kuota") },
-                            minLines = 3,
-                            maxLines = 6,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
-                            value = uiState.templateWaRekap,
-                            onValueChange = { v -> viewModel.updateState { it.copy(templateWaRekap = v) } },
-                            enabled = editable,
-                            label = { Text("Template WA Rekap Gedung") },
-                            minLines = 3,
-                            maxLines = 6,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                            OutlinedTextField(
+                                value = uiState.templateWaTagihan,
+                                onValueChange = { v -> viewModel.updateState { it.copy(templateWaTagihan = v) } },
+                                label = { Text("Template WA Tagihan") },
+                                minLines = 3,
+                                maxLines = 6,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = uiState.templateWaPeringatan,
+                                onValueChange = { v -> viewModel.updateState { it.copy(templateWaPeringatan = v) } },
+                                label = { Text("Template WA Peringatan Kuota") },
+                                minLines = 3,
+                                maxLines = 6,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = uiState.templateWaRekap,
+                                onValueChange = { v -> viewModel.updateState { it.copy(templateWaRekap = v) } },
+                                label = { Text("Template WA Rekap Gedung") },
+                                minLines = 3,
+                                maxLines = 6,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
 
-                        if (editable) {
                             MaroonPrimaryButton(
                                 text = "Simpan Template WA",
                                 loading = uiState.saving,

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -111,7 +112,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        LaundryCard {
+        LaundryCard(modifier = Modifier.widthIn(max = 460.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = "Masuk ke Akun Pengelola / Penjaga",

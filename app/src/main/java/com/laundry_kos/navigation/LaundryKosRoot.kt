@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,6 +17,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalLaundryService
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,7 +26,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -49,6 +56,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.laundry_kos.R
 import com.laundry_kos.core.designsystem.LaundryKosTheme
+import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.data.repository.LaundryKosRepository
 import com.laundry_kos.feature.auth.LoginScreen
 import com.laundry_kos.feature.auth.PropertiPickerScreen
@@ -116,7 +124,6 @@ fun LaundryKosRoot(
             )
         }
         is SessionUiState.Authenticated -> {
-            // Re-key seluruh NavHost & ViewModel per properti aktif agar perpindahan properti bersih total
             key(state.propertiAktif.id) {
                 AuthenticatedAppShell(
                     authState = state,
@@ -145,11 +152,35 @@ private fun AuthenticatedAppShell(
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route
     val isMainTab = MainTab.entries.any { it.route == currentRoute }
+    val isWideLayout = rememberIsWideLayout()
     val ext = LaundryKosTheme.extendedColors
     val canSwitchProperti = authState.propertiList.size > 1
+    val bolehKelolaPengaturan = authState.permissions.kelolaPengaturan
+
+    fun tabLabel(tab: MainTab): String = when {
+        tab == MainTab.PENGATURAN && !bolehKelolaPengaturan -> "Akun"
+        else -> ""
+    }
+
+    fun tabIcon(tab: MainTab): ImageVector = when {
+        tab == MainTab.PENGATURAN && !bolehKelolaPengaturan -> Icons.Default.Person
+        else -> tab.icon
+    }
+
+    fun navigateToTab(tab: MainTab) {
+        navController.navigate(tab.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // Hindari double statusBar/navBar insets pada screen detail/form yang sudah memiliki Scaffold sendiri
+        contentWindowInsets = if (isMainTab) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
         topBar = {
             if (isMainTab) {
                 TopAppBar(
@@ -199,28 +230,21 @@ private fun AuthenticatedAppShell(
             }
         },
         bottomBar = {
-            if (isMainTab) {
+            if (isMainTab && !isWideLayout) {
                 NavigationBar(
                     containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 0.dp,
                 ) {
                     MainTab.entries.forEach { tab ->
                         val selected = currentRoute == tab.route
+                        val label = tabLabel(tab).ifEmpty { stringResource(tab.labelRes) }
                         NavigationBarItem(
                             selected = selected,
-                            onClick = {
-                                navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
+                            onClick = { navigateToTab(tab) },
+                            icon = { Icon(tabIcon(tab), contentDescription = label) },
                             label = {
                                 Text(
-                                    text = stringResource(tab.labelRes),
+                                    text = label,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -238,157 +262,199 @@ private fun AuthenticatedAppShell(
             }
         },
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = MainTab.BERANDA.route,
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            composable(MainTab.BERANDA.route) { entry ->
-                val vm: BerandaViewModel = viewModel(
-                    key = "beranda_${authState.propertiAktif.id}",
-                    factory = BerandaViewModel.Factory(repository),
-                )
-                val needsRefresh by entry.savedStateHandle
-                    .getStateFlow("refresh_data", false)
-                    .collectAsStateWithLifecycle()
-                LaunchedEffect(needsRefresh) {
-                    if (needsRefresh) {
-                        vm.load(isRefresh = true)
-                        entry.savedStateHandle["refresh_data"] = false
+            if (isMainTab && isWideLayout) {
+                NavigationRail(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxHeight(),
+                ) {
+                    MainTab.entries.forEach { tab ->
+                        val selected = currentRoute == tab.route
+                        val label = tabLabel(tab).ifEmpty { stringResource(tab.labelRes) }
+                        NavigationRailItem(
+                            selected = selected,
+                            onClick = { navigateToTab(tab) },
+                            icon = { Icon(tabIcon(tab), contentDescription = label) },
+                            label = {
+                                Text(
+                                    text = label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = ext.goldContainer,
+                                unselectedIconColor = ext.muted,
+                                unselectedTextColor = ext.muted,
+                            ),
+                        )
                     }
                 }
-                BerandaScreen(
-                    viewModel = vm,
-                    permissions = authState.permissions,
-                    onCatatLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
-                    onOpenPenghuniDetail = { id -> navController.navigate("penghuni/detail/$id") },
-                )
             }
 
-            composable(MainTab.LAUNDRY.route) { entry ->
-                val vm: LaundryListViewModel = viewModel(
-                    key = "laundry_${authState.propertiAktif.id}",
-                    factory = LaundryListViewModel.Factory(repository),
-                )
-                val needsRefresh by entry.savedStateHandle
-                    .getStateFlow("refresh_data", false)
-                    .collectAsStateWithLifecycle()
-                LaunchedEffect(needsRefresh) {
-                    if (needsRefresh) {
-                        vm.load(isRefresh = true)
-                        entry.savedStateHandle["refresh_data"] = false
-                    }
-                }
-                LaundryListScreen(
-                    viewModel = vm,
-                    permissions = authState.permissions,
-                    onAddLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
-                    onEditLaundry = { id -> navController.navigate("laundry/edit/$id") },
-                )
-            }
-
-            composable(MainTab.PENGHUNI.route) {
-                val vm: PenghuniListViewModel = viewModel(
-                    key = "penghuni_${authState.propertiAktif.id}",
-                    factory = PenghuniListViewModel.Factory(repository),
-                )
-                PenghuniListScreen(
-                    viewModel = vm,
-                    onOpenDetail = { id -> navController.navigate("penghuni/detail/$id") },
-                )
-            }
-
-            composable(MainTab.LAPORAN.route) {
-                val vm: LaporanViewModel = viewModel(
-                    key = "laporan_${authState.propertiAktif.id}",
-                    factory = LaporanViewModel.Factory(repository),
-                )
-                LaporanScreen(viewModel = vm)
-            }
-
-            composable(MainTab.PENGATURAN.route) {
-                val vm: PengaturanViewModel = viewModel(
-                    key = "pengaturan_${authState.propertiAktif.id}",
-                    factory = PengaturanViewModel.Factory(repository),
-                )
-                PengaturanScreen(
-                    viewModel = vm,
-                    user = authState.user,
-                    propertiAktif = authState.propertiAktif,
-                    canSwitchProperti = canSwitchProperti,
-                    onSwitchProperti = onOpenPropertiSwitcher,
-                    onLogout = onLogout,
-                )
-            }
-
-            composable(ROUTE_LAUNDRY_NEW) {
-                val vm: LaundryFormViewModel = viewModel(
-                    factory = LaundryFormViewModel.Factory(repository, editId = null),
-                )
-                LaundryFormScreen(
-                    viewModel = vm,
-                    onBack = { navController.popBackStack() },
-                    onSaved = {
-                        navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
-                        navController.popBackStack()
-                    },
-                    onOpenExistingEdit = { existingId ->
-                        navController.navigate("laundry/edit/$existingId") {
-                            popUpTo(ROUTE_LAUNDRY_NEW) { inclusive = true }
+            NavHost(
+                navController = navController,
+                startDestination = MainTab.BERANDA.route,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+            ) {
+                composable(MainTab.BERANDA.route) { entry ->
+                    val vm: BerandaViewModel = viewModel(
+                        key = "beranda_${authState.propertiAktif.id}",
+                        factory = BerandaViewModel.Factory(repository),
+                    )
+                    val needsRefresh by entry.savedStateHandle
+                        .getStateFlow("refresh_data", false)
+                        .collectAsStateWithLifecycle()
+                    LaunchedEffect(needsRefresh) {
+                        if (needsRefresh) {
+                            vm.load(isRefresh = true)
+                            entry.savedStateHandle["refresh_data"] = false
                         }
-                    },
-                )
-            }
-
-            composable(
-                route = ROUTE_LAUNDRY_EDIT,
-                arguments = listOf(navArgument("id") { type = NavType.IntType }),
-            ) { entry ->
-                val id = entry.arguments?.getInt("id") ?: return@composable
-                val vm: LaundryFormViewModel = viewModel(
-                    key = "laundry_edit_$id",
-                    factory = LaundryFormViewModel.Factory(repository, editId = id),
-                )
-                LaundryFormScreen(
-                    viewModel = vm,
-                    onBack = { navController.popBackStack() },
-                    onSaved = {
-                        navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
-                        navController.popBackStack()
-                    },
-                    onOpenExistingEdit = { existingId ->
-                        navController.navigate("laundry/edit/$existingId") {
-                            popUpTo(ROUTE_LAUNDRY_EDIT) { inclusive = true }
-                        }
-                    },
-                )
-            }
-
-            composable(
-                route = ROUTE_PENGHUNI_DETAIL,
-                arguments = listOf(navArgument("id") { type = NavType.IntType }),
-            ) { entry ->
-                val id = entry.arguments?.getInt("id") ?: return@composable
-                val vm: PenghuniDetailViewModel = viewModel(
-                    key = "penghuni_detail_$id",
-                    factory = PenghuniDetailViewModel.Factory(repository, penghuniId = id),
-                )
-                val needsRefresh by entry.savedStateHandle
-                    .getStateFlow("refresh_data", false)
-                    .collectAsStateWithLifecycle()
-                LaunchedEffect(needsRefresh) {
-                    if (needsRefresh) {
-                        vm.load(isRefresh = true)
-                        entry.savedStateHandle["refresh_data"] = false
                     }
+                    BerandaScreen(
+                        viewModel = vm,
+                        permissions = authState.permissions,
+                        onCatatLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
+                        onOpenPenghuniDetail = { id -> navController.navigate("penghuni/detail/$id") },
+                    )
                 }
-                PenghuniDetailScreen(
-                    viewModel = vm,
-                    onBack = { navController.popBackStack() },
-                    onEditLaundry = { laundryId -> navController.navigate("laundry/edit/$laundryId") },
-                )
+
+                composable(MainTab.LAUNDRY.route) { entry ->
+                    val vm: LaundryListViewModel = viewModel(
+                        key = "laundry_${authState.propertiAktif.id}",
+                        factory = LaundryListViewModel.Factory(repository),
+                    )
+                    val needsRefresh by entry.savedStateHandle
+                        .getStateFlow("refresh_data", false)
+                        .collectAsStateWithLifecycle()
+                    LaunchedEffect(needsRefresh) {
+                        if (needsRefresh) {
+                            vm.load(isRefresh = true)
+                            entry.savedStateHandle["refresh_data"] = false
+                        }
+                    }
+                    LaundryListScreen(
+                        viewModel = vm,
+                        permissions = authState.permissions,
+                        onAddLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
+                        onEditLaundry = { id -> navController.navigate("laundry/edit/$id") },
+                    )
+                }
+
+                composable(MainTab.PENGHUNI.route) {
+                    val vm: PenghuniListViewModel = viewModel(
+                        key = "penghuni_${authState.propertiAktif.id}",
+                        factory = PenghuniListViewModel.Factory(repository),
+                    )
+                    PenghuniListScreen(
+                        viewModel = vm,
+                        onOpenDetail = { id -> navController.navigate("penghuni/detail/$id") },
+                    )
+                }
+
+                composable(MainTab.LAPORAN.route) {
+                    val vm: LaporanViewModel = viewModel(
+                        key = "laporan_${authState.propertiAktif.id}",
+                        factory = LaporanViewModel.Factory(repository),
+                    )
+                    LaporanScreen(viewModel = vm)
+                }
+
+                composable(MainTab.PENGATURAN.route) {
+                    val vm: PengaturanViewModel? = if (bolehKelolaPengaturan) {
+                        viewModel(
+                            key = "pengaturan_${authState.propertiAktif.id}",
+                            factory = PengaturanViewModel.Factory(repository),
+                        )
+                    } else {
+                        null
+                    }
+                    PengaturanScreen(
+                        viewModel = vm,
+                        user = authState.user,
+                        propertiAktif = authState.propertiAktif,
+                        bolehKelolaPengaturan = bolehKelolaPengaturan,
+                        canSwitchProperti = canSwitchProperti,
+                        onSwitchProperti = onOpenPropertiSwitcher,
+                        onLogout = onLogout,
+                    )
+                }
+
+                composable(ROUTE_LAUNDRY_NEW) {
+                    val vm: LaundryFormViewModel = viewModel(
+                        factory = LaundryFormViewModel.Factory(repository, editId = null),
+                    )
+                    LaundryFormScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onSaved = {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
+                            navController.popBackStack()
+                        },
+                        onOpenExistingEdit = { existingId ->
+                            navController.navigate("laundry/edit/$existingId") {
+                                popUpTo(ROUTE_LAUNDRY_NEW) { inclusive = true }
+                            }
+                        },
+                    )
+                }
+
+                composable(
+                    route = ROUTE_LAUNDRY_EDIT,
+                    arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                ) { entry ->
+                    val id = entry.arguments?.getInt("id") ?: return@composable
+                    val vm: LaundryFormViewModel = viewModel(
+                        key = "laundry_edit_$id",
+                        factory = LaundryFormViewModel.Factory(repository, editId = id),
+                    )
+                    LaundryFormScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onSaved = {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
+                            navController.popBackStack()
+                        },
+                        onOpenExistingEdit = { existingId ->
+                            navController.navigate("laundry/edit/$existingId") {
+                                popUpTo(ROUTE_LAUNDRY_EDIT) { inclusive = true }
+                            }
+                        },
+                    )
+                }
+
+                composable(
+                    route = ROUTE_PENGHUNI_DETAIL,
+                    arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                ) { entry ->
+                    val id = entry.arguments?.getInt("id") ?: return@composable
+                    val vm: PenghuniDetailViewModel = viewModel(
+                        key = "penghuni_detail_$id",
+                        factory = PenghuniDetailViewModel.Factory(repository, penghuniId = id),
+                    )
+                    val needsRefresh by entry.savedStateHandle
+                        .getStateFlow("refresh_data", false)
+                        .collectAsStateWithLifecycle()
+                    LaunchedEffect(needsRefresh) {
+                        if (needsRefresh) {
+                            vm.load(isRefresh = true)
+                            entry.savedStateHandle["refresh_data"] = false
+                        }
+                    }
+                    PenghuniDetailScreen(
+                        viewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onEditLaundry = { laundryId -> navController.navigate("laundry/edit/$laundryId") },
+                    )
+                }
             }
         }
     }

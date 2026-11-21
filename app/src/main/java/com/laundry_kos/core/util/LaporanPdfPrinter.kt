@@ -10,8 +10,11 @@ import com.laundry_kos.data.dto.LaporanBarisDto
 import com.laundry_kos.data.dto.LaporanResponse
 
 /**
- * Menghasilkan dokumen HTML A4 2 kolom sesuai gaya cetak `app.css` lalu mencetak / menyimpan PDF
- * memakai Android PrintManager bawaan.
+ * Menghasilkan dokumen HTML A4 2 kolom persis desain cetak resmi web (`laporan/index.blade.php`):
+ * - Header rentang + garis marun tebal
+ * - 3 kotak ringkasan saja (Total Laundry, Jumlah Penghuni, Mendekati / Lewat)
+ * - Grid kartu 2 kolom bergaris titik-titik + batang berwarna (Biaya utama, Tagihan lewat kuota, Bayar terpisah)
+ * - Footer marun total keseluruhan
  */
 object LaporanPdfPrinter {
 
@@ -66,171 +69,336 @@ object LaporanPdfPrinter {
                 background: #FFFFFF;
                 margin: 0;
                 padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
               }
               .header {
-                border-bottom: 2px solid #8B1A1A;
-                padding-bottom: 8px;
-                margin-bottom: 10px;
                 display: flex;
                 justify-content: space-between;
-                align-items: flex-end;
-              }
-              .title { font-size: 16px; font-weight: 700; color: #8B1A1A; margin: 0; }
-              .subtitle { font-size: 11px; color: #6B7280; margin-top: 2px; }
-              .meta { text-align: right; font-size: 10px; color: #6B7280; }
-              .summary {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 6px;
+                align-items: flex-start;
+                gap: 12px;
+                border-bottom: 3px solid #8B1A1A;
+                padding-bottom: 10px;
                 margin-bottom: 12px;
               }
-              .sum-box {
-                border: 1px solid #ECE5DB;
-                background: #FCFAF6;
-                border-radius: 6px;
-                padding: 6px 8px;
+              .prop-name { font-size: 11px; font-weight: 700; color: #1C1C1C; margin: 0; }
+              .period { font-size: 18px; font-weight: 800; color: #1C1C1C; margin: 2px 0 3px 0; letter-spacing: -0.2px; }
+              .sub-note { font-size: 10px; color: #6B7280; margin: 0; }
+              .head-right { text-align: right; }
+              .doc-tag { font-size: 10px; font-weight: 800; color: #C8920E; letter-spacing: 0.6px; text-transform: uppercase; margin: 0; }
+              .head-meta { font-size: 9.5px; color: #6B7280; margin: 2px 0 0 0; }
+
+              .stats {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+                margin-bottom: 14px;
               }
-              .sum-label { font-size: 9px; color: #6B7280; }
-              .sum-val { font-size: 12px; font-weight: 700; color: #1C1C1C; margin-top: 2px; }
-              .sum-val.danger { color: #DC2626; }
+              .stat-card {
+                border: 1px solid #ECE5DB;
+                border-radius: 12px;
+                padding: 10px 12px;
+                background: #FFFFFF;
+              }
+              .stat-label { font-size: 9px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 0.4px; }
+              .stat-val { font-size: 16px; font-weight: 800; margin-top: 4px; color: #C8920E; }
+              .stat-val.danger { color: #DC2626; }
+
+              .section-title {
+                font-size: 9.5px;
+                font-weight: 800;
+                letter-spacing: 0.6px;
+                color: #6B7280;
+                text-transform: uppercase;
+                margin: 0 0 8px 0;
+              }
+
               .grid {
                 display: grid;
                 grid-template-columns: repeat(2, 1fr);
-                gap: 8px;
+                gap: 10px;
                 align-items: start;
               }
               .card {
-                border: 1px solid #E0D7C9;
-                border-radius: 8px;
-                padding: 8px;
+                border: 1px solid #ECE5DB;
+                border-radius: 14px;
+                padding: 10px;
                 break-inside: avoid;
                 page-break-inside: avoid;
                 background: #FFFFFF;
               }
-              .card-head {
+              .card-top {
                 display: flex;
                 justify-content: space-between;
-                align-items: baseline;
-                border-bottom: 1px solid #ECE5DB;
-                padding-bottom: 4px;
-                margin-bottom: 6px;
+                align-items: flex-start;
+                gap: 8px;
               }
-              .card-name { font-weight: 700; font-size: 11.5px; color: #8B1A1A; }
-              .card-kamar {
-                background: #FBF1D8;
-                color: #6B4E08;
+              .card-left { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1; }
+              .room-pill {
+                background: #F6E6E6;
+                color: #8B1A1A;
+                font-weight: 800;
+                font-size: 10.5px;
                 border-radius: 999px;
-                padding: 1px 6px;
+                padding: 5px 10px;
+                white-space: nowrap;
+                flex-shrink: 0;
+              }
+              .resident-name { font-size: 12px; font-weight: 800; color: #1C1C1C; margin: 0; }
+              .resident-meta { font-size: 9.5px; color: #6B7280; margin: 2px 0 0 0; }
+              .quota-line { font-size: 9.5px; font-weight: 600; color: #374151; margin: 3px 0 0 0; line-height: 1.35; }
+              .total-kg { font-size: 13.5px; font-weight: 800; color: #8B1A1A; white-space: nowrap; }
+
+              .badge {
+                display: inline-block;
+                margin-top: 5px;
+                border-radius: 999px;
+                padding: 2px 8px;
+                font-size: 9px;
+                font-weight: 700;
+              }
+              .badge-normal { background: #DCFCE7; color: #15803D; }
+              .badge-mendekati { background: #FBF1D8; color: #A16207; }
+              .badge-lewat { background: #FEE2E2; color: #DC2626; }
+
+              .entries-box {
+                margin-top: 8px;
+                background: #FAF7F2;
+                border-radius: 10px;
+                padding: 8px 10px;
+              }
+              .entry-row {
+                display: flex;
+                align-items: baseline;
+                margin-bottom: 4px;
+                font-size: 9.5px;
+              }
+              .entry-row:last-child { margin-bottom: 0; }
+              .entry-left { color: #6B7280; white-space: nowrap; }
+              .entry-dots {
+                flex: 1;
+                border-bottom: 1px dotted #D6CFC3;
+                margin: 0 6px;
+                min-width: 12px;
+              }
+              .entry-right { font-weight: 700; color: #1C1C1C; white-space: nowrap; }
+              .entry-row.merah .entry-right { color: #DC2626; }
+              .entry-note { font-size: 8.5px; color: #6B7280; font-style: italic; margin: -2px 0 4px 8px; }
+
+              .subtotal-row {
+                display: flex;
+                align-items: baseline;
+                margin-top: 6px;
+                padding-top: 6px;
+                border-top: 1px solid #ECE5DB;
+                font-size: 10px;
+                font-weight: 800;
+                color: #1C1C1C;
+              }
+
+              .bars { margin-top: 7px; display: flex; flex-direction: column; gap: 5px; }
+              .bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-radius: 9px;
+                padding: 5px 10px;
                 font-size: 9.5px;
                 font-weight: 700;
               }
-              table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-              th, td { padding: 2px 3px; text-align: left; border-bottom: 1px solid #F1EBE2; font-size: 9.5px; }
-              th { color: #6B7280; font-weight: 600; }
-              td.num, th.num { text-align: right; }
-              tr.merah td { color: #DC2626; font-weight: 700; background: #FEF2F2; }
-              .card-foot {
-                background: #FCFAF6;
-                border-radius: 5px;
-                padding: 5px 6px;
-                font-size: 9.5px;
+              .bar-ok { background: #E9F7EF; color: #15803D; }
+              .bar-danger { background: #FDECEC; color: #DC2626; }
+              .bar-gold { background: #FBF1D8; color: #6B4E08; }
+
+              .footer {
+                margin-top: 14px;
+                border-radius: 12px;
+                overflow: hidden;
+                break-inside: avoid;
+                page-break-inside: avoid;
               }
-              .foot-row { display: flex; justify-content: space-between; margin-top: 2px; }
-              .foot-row.bold { font-weight: 700; color: #1C1C1C; }
-              .foot-row.danger { font-weight: 700; color: #DC2626; }
+              .footer-top {
+                background: #8B1A1A;
+                color: #FFFFFF;
+                padding: 11px 14px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              }
+              .footer-title { font-size: 12px; font-weight: 800; margin: 0; }
+              .footer-sub { font-size: 9.5px; color: rgba(255,255,255,0.88); margin: 2px 0 0 0; }
+              .footer-kg { font-size: 18px; font-weight: 800; margin: 0; }
+              .footer-note {
+                background: #F1EBE2;
+                color: #6B7280;
+                font-size: 9px;
+                text-align: center;
+                padding: 6px 10px;
+              }
             </style>
             </head>
             <body>
             """.trimIndent()
         )
 
+        // Header
         sb.append("<div class='header'>")
-        sb.append("<div><div class='title'>").append(escape(laporan.namaProperti)).append("</div>")
-        sb.append("<div class='subtitle'>Laporan Laundry &bull; ").append(escape(laporan.rentang.label)).append("</div></div>")
-        sb.append("<div class='meta'>Kuota gratis: ").append(escape(laporan.kuotaGratisLabel))
-            .append(" kg<br/>Dicetak: ").append(escape(laporan.dicetakLabel)).append("</div>")
+        sb.append("<div>")
+        sb.append("<p class='prop-name'>").append(escape(laporan.namaProperti)).append("</p>")
+        sb.append("<h1 class='period'>").append(escape(laporan.rentang.label)).append("</h1>")
+        sb.append("<p class='sub-note'>Kuota gratis mengikuti periode laporan.</p>")
+        sb.append("</div>")
+        sb.append("<div class='head-right'>")
+        sb.append("<p class='doc-tag'>LAPORAN LAUNDRY</p>")
+        sb.append("<p class='head-meta'>Dicetak ").append(escape(laporan.dicetakLabel)).append("</p>")
+        sb.append("<p class='head-meta'>Kuota gratis ").append(escape(laporan.kuotaGratisLabel)).append(" kg / penghuni</p>")
+        sb.append("</div>")
         sb.append("</div>")
 
+        // 3 Kotak Ringkasan (persis gambar 7)
         val r = laporan.ringkasan
-        sb.append("<div class='summary'>")
-        sb.append("<div class='sum-box'><div class='sum-label'>Total Berat</div><div class='sum-val'>")
-            .append(escape(r.totalKgLabel)).append(" kg (").append(r.jumlahPenghuni).append(" penghuni)</div></div>")
-        sb.append("<div class='sum-box'><div class='sum-label'>Biaya Utama</div><div class='sum-val'>")
-            .append(escape(Formatters.formatRupiah(r.totalBiayaUtama))).append("</div></div>")
-        sb.append("<div class='sum-box'><div class='sum-label'>Tagihan Lewat Kuota</div><div class='sum-val danger'>")
-            .append(escape(Formatters.formatRupiah(r.totalTagihanLewat))).append("</div></div>")
-        sb.append("<div class='sum-box'><div class='sum-label'>Bayar Terpisah</div><div class='sum-val'>")
-            .append(escape(Formatters.formatRupiah(r.totalBayarTerpisah))).append("</div></div>")
+        sb.append("<div class='stats'>")
+        sb.append("<div class='stat-card'><div class='stat-label'>TOTAL LAUNDRY</div><div class='stat-val'>")
+            .append(escape(r.totalKgLabel)).append(" kg</div></div>")
+        sb.append("<div class='stat-card'><div class='stat-label'>JUMLAH PENGHUNI</div><div class='stat-val'>")
+            .append(r.jumlahPenghuni).append("</div></div>")
+        sb.append("<div class='stat-card'><div class='stat-label'>MENDEKATI / LEWAT</div><div class='stat-val danger'>")
+            .append(r.jumlahMendekatiLewat).append("</div></div>")
         sb.append("</div>")
 
+        sb.append("<h2 class='section-title'>RINCIAN PER PENGHUNI</h2>")
         sb.append("<div class='grid'>")
+
         for (kartu in laporan.kartuPenghuni) {
+            val kuota = kartu.kuota
+            val statusClass = when (kuota.status) {
+                "lewat" -> "badge-lewat"
+                "mendekati" -> "badge-mendekati"
+                else -> "badge-normal"
+            }
+            val statusLabel = when (kuota.status) {
+                "lewat" -> "Lewat kuota"
+                "mendekati" -> "Mendekati kuota"
+                else -> "Normal"
+            }
+            val terpakaiLbl = kuota.terpakaiLabel ?: kuota.terpakaiKg
+            val kuotaLbl = kuota.kuotaLabel ?: kuota.kuotaKg
+            val lebihLbl = kuota.kelebihanLabel ?: kuota.kelebihanKg
+
             sb.append("<div class='card'>")
-            sb.append("<div class='card-head'>")
-            sb.append("<span class='card-name'>").append(escape(kartu.penghuni.nama)).append("</span>")
-            sb.append("<span class='card-kamar'>Kamar ").append(escape(kartu.labelKamar)).append("</span>")
+            sb.append("<div class='card-top'>")
+            sb.append("<div class='card-left'>")
+            sb.append("<span class='room-pill'>").append(escape(kartu.labelKamar)).append("</span>")
+            sb.append("<div>")
+            sb.append("<p class='resident-name'>").append(escape(kartu.penghuni.nama)).append("</p>")
+            sb.append("<p class='resident-meta'>").append(kartu.jumlahCatatan).append(" catatan - Penghuni</p>")
+            sb.append("<p class='quota-line'>Kuota: ").append(escape(terpakaiLbl)).append(" / ")
+                .append(escape(kuotaLbl)).append(" kg kuota bulan ini")
+            if (kartu.tampilkanPeriodeIni) {
+                sb.append(" - Periode ini ").append(escape(kartu.totalKgLabel)).append(" kg")
+            }
+            if (kuota.kelebihanCenti > 0) {
+                sb.append(" - Lewat bulan ini ").append(escape(lebihLbl)).append(" kg")
+            }
+            sb.append("</p>")
+            sb.append("<span class='badge ").append(statusClass).append("'>").append(statusLabel).append("</span>")
+            sb.append("</div></div>")
+            sb.append("<span class='total-kg'>").append(escape(kartu.totalKgLabel)).append(" kg</span>")
             sb.append("</div>")
 
-            appendBarisTable(sb, kartu.baris)
+            appendDottedEntries(sb, kartu.baris, kartu.totalKgLabel, laporan.filter.rinci)
 
-            sb.append("<div class='card-foot'>")
-            sb.append("<div class='foot-row'><span>Total berat / Kuota</span><span>")
-                .append(escape(kartu.kuota.terpakaiLabel ?: kartu.kuota.terpakaiKg)).append(" / ")
-                .append(escape(kartu.kuota.kuotaLabel ?: kartu.kuota.kuotaKg)).append(" kg</span></div>")
-            sb.append("<div class='foot-row'><span>Biaya utama</span><span>")
+            sb.append("<div class='bars'>")
+            sb.append("<div class='bar bar-ok'><span>Biaya utama</span><span>")
                 .append(escape(Formatters.formatRupiah(kartu.biayaUtama))).append("</span></div>")
             if (kartu.tagihanLewatKuota > 0) {
-                sb.append("<div class='foot-row danger'><span>Tagihan lewat kuota</span><span>")
+                sb.append("<div class='bar bar-danger'><span>Tagihan lewat kuota ")
+                    .append(escape(lebihLbl)).append(" kg</span><span>")
                     .append(escape(Formatters.formatRupiah(kartu.tagihanLewatKuota))).append("</span></div>")
             }
             if (kartu.bayarTerpisah > 0) {
-                sb.append("<div class='foot-row bold'><span>Bayar terpisah (")
-                    .append(kartu.jumlahItemTerpisah).append(" item)</span><span>")
+                sb.append("<div class='bar bar-gold'><span>Bayar terpisah ")
+                    .append(kartu.jumlahItemTerpisah).append(" item</span><span>")
                     .append(escape(Formatters.formatRupiah(kartu.bayarTerpisah))).append("</span></div>")
             }
-            sb.append("</div></div>")
+            sb.append("</div>")
+            sb.append("</div>")
         }
 
         for (lain in laporan.kartuLainnya) {
             sb.append("<div class='card'>")
-            sb.append("<div class='card-head'>")
-            sb.append("<span class='card-name'>").append(escape(lain.judul)).append("</span>")
-            sb.append("<span class='card-kamar'>").append(escape(lain.totalKgLabel)).append(" kg</span>")
+            sb.append("<div class='card-top'>")
+            sb.append("<div><p class='resident-name'>").append(escape(lain.judul)).append("</p>")
+            sb.append("<p class='resident-meta'>").append(lain.jumlahCatatan).append(" catatan</p></div>")
+            sb.append("<span class='total-kg'>").append(escape(lain.totalKgLabel)).append(" kg</span>")
             sb.append("</div>")
 
-            appendBarisTable(sb, lain.baris)
+            appendDottedEntries(sb, lain.baris, lain.totalKgLabel, laporan.filter.rinci)
 
-            sb.append("<div class='card-foot'>")
-            sb.append("<div class='foot-row bold'><span>Biaya utama</span><span>")
+            sb.append("<div class='bars'>")
+            sb.append("<div class='bar bar-ok'><span>Biaya utama</span><span>")
                 .append(escape(Formatters.formatRupiah(lain.biayaUtama))).append("</span></div>")
             if (lain.bayarTerpisah > 0) {
-                sb.append("<div class='foot-row'><span>Bayar terpisah</span><span>")
+                sb.append("<div class='bar bar-gold'><span>Bayar terpisah ")
+                    .append(lain.jumlahItemTerpisah).append(" item</span><span>")
                     .append(escape(Formatters.formatRupiah(lain.bayarTerpisah))).append("</span></div>")
             }
             sb.append("</div></div>")
         }
 
-        sb.append("</div></body></html>")
+        sb.append("</div>")
+
+        // Footer Marun Total Keseluruhan
+        sb.append("<div class='footer'>")
+        sb.append("<div class='footer-top'>")
+        sb.append("<div><p class='footer-title'>Total keseluruhan laundry</p>")
+        sb.append("<p class='footer-sub'>Tagihan lewat kuota ").append(escape(Formatters.formatRupiah(r.totalTagihanLewat)))
+            .append(" &middot; Biaya utama ").append(escape(Formatters.formatRupiah(r.totalBiayaUtama)))
+            .append(" &middot; Bayar terpisah ").append(escape(Formatters.formatRupiah(r.totalBayarTerpisah)))
+            .append("</p></div>")
+        sb.append("<p class='footer-kg'>").append(escape(r.totalKgLabel)).append(" kg</p>")
+        sb.append("</div>")
+        sb.append("<div class='footer-note'>Entri mengikuti filter tanggal. Kuota gratis dihitung dari total bulan terkait.</div>")
+        sb.append("</div>")
+
+        sb.append("</body></html>")
         return sb.toString()
     }
 
-    private fun appendBarisTable(sb: StringBuilder, baris: List<LaporanBarisDto>) {
-        if (baris.isEmpty()) return
-        sb.append("<table><thead><tr><th>Tanggal</th><th>Uraian</th><th class='num'>Biaya</th></tr></thead><tbody>")
+    private fun appendDottedEntries(
+        sb: StringBuilder,
+        baris: List<LaporanBarisDto>,
+        subtotalKgLabel: String,
+        rinci: Boolean,
+    ) {
+        sb.append("<div class='entries-box'>")
         for (row in baris) {
-            val trClass = if (row.merah) " class='merah'" else ""
-            sb.append("<tr").append(trClass).append(">")
-            sb.append("<td>").append(escape(row.tanggalLabel)).append("</td>")
-            if (row.tipe == "item") {
-                sb.append("<td>Item: ").append(escape(row.namaItem ?: "-")).append("</td>")
+            val rowClass = if (row.merah) "entry-row merah" else "entry-row"
+            val left = if (row.tipe == "item") {
+                "${row.tanggalLabel} - ${row.namaItem ?: "Item"}"
             } else {
-                val label = (row.beratLabel ?: "-") + " kg" + if (row.merah) " *" else ""
-                sb.append("<td>").append(escape(label)).append("</td>")
+                row.tanggalLabel
             }
-            sb.append("<td class='num'>").append(escape(Formatters.formatRupiah(row.biaya, "Belum diisi"))).append("</td>")
-            sb.append("</tr>")
+            val right = if (row.tipe == "item") {
+                "1 item - ${Formatters.formatRupiah(row.biaya, "Rp0")}"
+            } else {
+                val beratPart = "${row.beratLabel ?: "-"} kg"
+                if (row.biaya != null) "$beratPart - ${Formatters.formatRupiah(row.biaya)}" else beratPart
+            }
+            sb.append("<div class='").append(rowClass).append("'>")
+            sb.append("<span class='entry-left'>").append(escape(left)).append("</span>")
+            sb.append("<span class='entry-dots'></span>")
+            sb.append("<span class='entry-right'>").append(escape(right)).append("</span>")
+            sb.append("</div>")
+            if (rinci && !row.catatan.isNullOrBlank()) {
+                sb.append("<div class='entry-note'>Catatan: ").append(escape(row.catatan)).append("</div>")
+            }
         }
-        sb.append("</tbody></table>")
+        sb.append("<div class='subtotal-row'>")
+        sb.append("<span>Subtotal semua</span>")
+        sb.append("<span class='entry-dots'></span>")
+        sb.append("<span>").append(escape(subtotalKgLabel)).append(" kg</span>")
+        sb.append("</div></div>")
     }
 
     private fun escape(text: String): String = text

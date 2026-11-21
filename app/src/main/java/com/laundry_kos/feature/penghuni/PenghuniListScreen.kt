@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -58,6 +59,7 @@ import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.MonthSelectorBar
 import com.laundry_kos.core.designsystem.StatusBadge
+import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.data.dto.KamarDto
@@ -80,6 +82,7 @@ fun PenghuniListScreen(
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val ext = LaundryKosTheme.extendedColors
+    val isWide = rememberIsWideLayout()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.snackbarMessage) {
@@ -93,6 +96,7 @@ fun PenghuniListScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (bolehTambah) {
@@ -180,11 +184,31 @@ fun PenghuniListScreen(
                         )
                     }
                 } else if (data != null) {
-                    items(data.data, key = { it.id }) { penghuni ->
-                        PenghuniItemCard(
-                            penghuni = penghuni,
-                            onClick = { onOpenDetail(penghuni.id) },
-                        )
+                    if (isWide) {
+                        items(data.data.chunked(2)) { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                pair.forEach { penghuni ->
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        PenghuniItemCard(
+                                            penghuni = penghuni,
+                                            onClick = { onOpenDetail(penghuni.id) },
+                                        )
+                                    }
+                                }
+                                if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        items(data.data, key = { it.id }) { penghuni ->
+                            PenghuniItemCard(
+                                penghuni = penghuni,
+                                onClick = { onOpenDetail(penghuni.id) },
+                            )
+                        }
                     }
                 }
             }

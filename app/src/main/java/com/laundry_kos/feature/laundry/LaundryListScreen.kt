@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -66,6 +67,7 @@ import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LoadMoreButton
 import com.laundry_kos.core.designsystem.StatusBadge
+import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.data.dto.LaundryDto
@@ -97,6 +99,7 @@ fun LaundryListScreen(
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val ext = LaundryKosTheme.extendedColors
+    val isWide = rememberIsWideLayout()
     val snackbarHostState = remember { SnackbarHostState() }
     var deleteConfirmTarget by remember { mutableStateOf<LaundryDto?>(null) }
     var showLengkapiConfirm by remember { mutableStateOf(false) }
@@ -110,6 +113,7 @@ fun LaundryListScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (permissions.catatLaundry) {
@@ -305,13 +309,35 @@ fun LaundryListScreen(
                         )
                     }
                 } else if (data != null) {
-                    items(data.data, key = { it.id }) { item ->
-                        LaundryRowCard(
-                            item = item,
-                            onEdit = { onEditLaundry(item.id) },
-                            onDelete = { deleteConfirmTarget = item },
-                            onTetapkanPemilik = { viewModel.openTetapkanPemilik(item) },
-                        )
+                    if (isWide) {
+                        items(data.data.chunked(2)) { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                pair.forEach { item ->
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        LaundryRowCard(
+                                            item = item,
+                                            onEdit = { onEditLaundry(item.id) },
+                                            onDelete = { deleteConfirmTarget = item },
+                                            onTetapkanPemilik = { viewModel.openTetapkanPemilik(item) },
+                                        )
+                                    }
+                                }
+                                if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        items(data.data, key = { it.id }) { item ->
+                            LaundryRowCard(
+                                item = item,
+                                onEdit = { onEditLaundry(item.id) },
+                                onDelete = { deleteConfirmTarget = item },
+                                onTetapkanPemilik = { viewModel.openTetapkanPemilik(item) },
+                            )
+                        }
                     }
 
                     if (data.meta.adaLagi) {
