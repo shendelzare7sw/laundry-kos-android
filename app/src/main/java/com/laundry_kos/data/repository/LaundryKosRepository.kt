@@ -1,0 +1,203 @@
+package com.laundry_kos.data.repository
+
+import android.os.Build
+import com.laundry_kos.core.network.ApiEventBus
+import com.laundry_kos.core.network.ApiResult
+import com.laundry_kos.core.network.safeApiCall
+import com.laundry_kos.core.session.SessionStore
+import com.laundry_kos.data.api.LaundryKosApi
+import com.laundry_kos.data.dto.*
+
+class LaundryKosRepository(
+    private val api: LaundryKosApi,
+    val sessionStore: SessionStore,
+    val eventBus: ApiEventBus,
+) {
+    // --- Auth & Session ---
+    suspend fun login(username: String, password: String): ApiResult<AuthResponseDto> {
+        val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim().ifBlank { "Android" }
+        val result = safeApiCall {
+            api.login(
+                LoginRequestDto(
+                    username = username.trim(),
+                    password = password,
+                    deviceName = deviceName,
+                ),
+            )
+        }
+        if (result is ApiResult.Success) {
+            sessionStore.saveSession(
+                token = result.data.token,
+                propertiId = result.data.propertiAktif?.id,
+            )
+        }
+        return result
+    }
+
+    suspend fun fetchMe(): ApiResult<MeResponseDto> {
+        val result = safeApiCall(eventBus) { api.me() }
+        if (result is ApiResult.Success) {
+            sessionStore.savePropertiId(result.data.propertiAktif?.id)
+        }
+        return result
+    }
+
+    suspend fun selectProperti(propertiId: Int): ApiResult<MeResponseDto> {
+        sessionStore.savePropertiId(propertiId)
+        return safeApiCall(eventBus) { api.me() }
+    }
+
+    suspend fun logout() {
+        runCatching { api.logout() }
+        sessionStore.clearSession()
+    }
+
+    suspend fun fetchProperti(): ApiResult<PropertiListResponseDto> =
+        safeApiCall(eventBus) { api.properti() }
+
+    suspend fun fetchKamar(hanyaKosong: Boolean = false): ApiResult<KamarListResponseDto> =
+        safeApiCall(eventBus) { api.kamar(kosong = if (hanyaKosong) 1 else null) }
+
+    // --- Beranda ---
+    suspend fun fetchBeranda(bulan: String? = null): ApiResult<BerandaResponseDto> =
+        safeApiCall(eventBus) { api.beranda(bulan = bulan) }
+
+    // --- Laundry ---
+    suspend fun fetchLaundryList(
+        periode: String = "bulan_ini",
+        dari: String? = null,
+        sampai: String? = null,
+        cari: String? = null,
+        jenis: String? = null,
+        tampil: Int = 20,
+    ): ApiResult<LaundryListResponseDto> = safeApiCall(eventBus) {
+        api.laundryList(
+            periode = periode,
+            dari = dari?.takeIf { it.isNotBlank() },
+            sampai = sampai?.takeIf { it.isNotBlank() },
+            cari = cari?.takeIf { it.isNotBlank() },
+            jenis = jenis?.takeIf { it.isNotBlank() },
+            tampil = tampil,
+        )
+    }
+
+    suspend fun fetchInfoKuota(
+        tanggal: String,
+        penghuniId: Int? = null,
+        beratKg: String? = null,
+        kecualiId: Int? = null,
+    ): ApiResult<InfoKuotaResponseDto> = safeApiCall(eventBus) {
+        api.infoKuota(
+            tanggal = tanggal,
+            penghuniId = penghuniId,
+            beratKg = beratKg?.takeIf { it.isNotBlank() },
+            kecualiId = kecualiId,
+        )
+    }
+
+    suspend fun fetchLaundryDetail(id: Int): ApiResult<LaundryDetailResponseDto> =
+        safeApiCall(eventBus) { api.detailLaundry(id) }
+
+    suspend fun tambahLaundry(request: SimpanLaundryRequestDto): ApiResult<LaundryMutasiResponseDto> =
+        safeApiCall(eventBus) { api.tambahLaundry(request) }
+
+    suspend fun ubahLaundry(id: Int, request: SimpanLaundryRequestDto): ApiResult<LaundryMutasiResponseDto> =
+        safeApiCall(eventBus) { api.ubahLaundry(id, request) }
+
+    suspend fun hapusLaundry(id: Int): ApiResult<HapusLaundryResponseDto> =
+        safeApiCall(eventBus) { api.hapusLaundry(id) }
+
+    suspend fun fetchLaundryTerhapus(tampil: Int = 15): ApiResult<TerhapusListResponseDto> =
+        safeApiCall(eventBus) { api.laundryTerhapus(tampil = tampil) }
+
+    suspend fun pulihkanLaundry(id: Int): ApiResult<LaundryMutasiResponseDto> =
+        safeApiCall(eventBus) { api.pulihkanLaundry(id) }
+
+    suspend fun tetapkanPemilik(id: Int, penghuniId: Int): ApiResult<LaundryMutasiResponseDto> =
+        safeApiCall(eventBus) { api.tetapkanPemilik(id, TetapkanPemilikRequestDto(penghuniId)) }
+
+    suspend fun lengkapiHarga(): ApiResult<LengkapiHargaResponseDto> =
+        safeApiCall(eventBus) { api.lengkapiHarga() }
+
+    // --- Penghuni ---
+    suspend fun fetchPenghuniList(
+        tab: String = "semua",
+        cari: String? = null,
+        bulan: String? = null,
+    ): ApiResult<PenghuniListResponseDto> = safeApiCall(eventBus) {
+        api.penghuniList(
+            tab = tab,
+            cari = cari?.takeIf { it.isNotBlank() },
+            bulan = bulan?.takeIf { it.isNotBlank() },
+        )
+    }
+
+    suspend fun fetchPenghuniDetail(id: Int, bulan: String? = null): ApiResult<PenghuniDetailResponseDto> =
+        safeApiCall(eventBus) { api.detailPenghuni(id, bulan) }
+
+    suspend fun tambahPenghuni(request: MasukPenghuniRequestDto): ApiResult<PenghuniMutasiResponseDto> =
+        safeApiCall(eventBus) { api.tambahPenghuni(request) }
+
+    suspend fun ubahPenghuni(id: Int, request: UbahPenghuniRequestDto): ApiResult<PenghuniMutasiResponseDto> =
+        safeApiCall(eventBus) { api.ubahPenghuni(id, request) }
+
+    suspend fun pindahKamar(id: Int, request: PindahKamarRequestDto): ApiResult<PenempatanMutasiResponseDto> =
+        safeApiCall(eventBus) { api.pindahKamar(id, request) }
+
+    suspend fun batalkanPindah(id: Int): ApiResult<PenempatanMutasiResponseDto> =
+        safeApiCall(eventBus) { api.batalkanPindah(id) }
+
+    suspend fun keluarPenghuni(id: Int, request: KeluarPenghuniRequestDto): ApiResult<PenghuniMutasiResponseDto> =
+        safeApiCall(eventBus) { api.keluarPenghuni(id, request) }
+
+    suspend fun batalkanKeluar(id: Int): ApiResult<PenghuniMutasiResponseDto> =
+        safeApiCall(eventBus) { api.batalkanKeluar(id) }
+
+    suspend fun gantiNomor(id: Int, noWa: String?): ApiResult<PenghuniMutasiResponseDto> =
+        safeApiCall(eventBus) { api.gantiNomor(id, GantiNomorRequestDto(noWa?.takeIf { it.isNotBlank() })) }
+
+    suspend fun simpanPenyesuaianKuota(
+        penghuniId: Int,
+        request: PenyesuaianKuotaRequestDto,
+    ): ApiResult<PenyesuaianKuotaResponseDto> =
+        safeApiCall(eventBus) { api.simpanPenyesuaianKuota(penghuniId, request) }
+
+    // --- Laporan & WA ---
+    suspend fun fetchLaporan(
+        periode: String = "bulan_ini",
+        dari: String? = null,
+        sampai: String? = null,
+        penghuniId: Int? = null,
+        rinci: Boolean = false,
+    ): ApiResult<LaporanResponse> = safeApiCall(eventBus) {
+        api.laporan(
+            periode = periode,
+            dari = dari?.takeIf { it.isNotBlank() },
+            sampai = sampai?.takeIf { it.isNotBlank() },
+            penghuniId = penghuniId,
+            rinci = if (rinci) 1 else 0,
+        )
+    }
+
+    suspend fun fetchWaTagihan(penghuniId: Int, bulan: String? = null): ApiResult<WaMessageDto> =
+        safeApiCall(eventBus) { api.waTagihan(penghuniId, bulan) }
+
+    suspend fun fetchWaPeringatan(penghuniId: Int, bulan: String? = null): ApiResult<WaMessageDto> =
+        safeApiCall(eventBus) { api.waPeringatan(penghuniId, bulan) }
+
+    // --- Pengaturan ---
+    suspend fun fetchPengaturan(tanggal: String? = null): ApiResult<PengaturanResponseDto> =
+        safeApiCall(eventBus) { api.pengaturan(tanggal = tanggal?.takeIf { it.isNotBlank() }) }
+
+    suspend fun simpanAturan(request: SimpanAturanRequestDto): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.simpanAturan(request) }
+
+    suspend fun simpanIzinPenjaga(request: SimpanIzinPenjagaRequestDto): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.simpanIzinPenjaga(request) }
+
+    suspend fun simpanTemplateWa(request: SimpanTemplateWaRequestDto): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.simpanTemplateWa(request) }
+
+    suspend fun resetTemplateWa(kunci: String? = null): ApiResult<MessageResponseDto> =
+        safeApiCall(eventBus) { api.resetTemplateWa(ResetTemplateWaRequestDto(kunci)) }
+}
