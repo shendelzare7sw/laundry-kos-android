@@ -231,6 +231,7 @@ fun PropertiPickerScreen(
                         )
                     }
                 } else if (isWide) {
+                    val isGlobalRole = uiState.user.role == "owner" || uiState.user.role == "dev_admin"
                     items(uiState.propertiList.chunked(2)) { pair ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -240,6 +241,7 @@ fun PropertiPickerScreen(
                             pair.forEach { properti ->
                                 GedungItemCard(
                                     properti = properti,
+                                    canManage = properti.bolehUbah || isGlobalRole,
                                     enabled = !uiState.isSubmitting,
                                     onOpen = { onSelect(properti.id) },
                                     onEdit = { editTarget = properti },
@@ -251,9 +253,11 @@ fun PropertiPickerScreen(
                         }
                     }
                 } else {
+                    val isGlobalRole = uiState.user.role == "owner" || uiState.user.role == "dev_admin"
                     items(uiState.propertiList, key = { it.id }) { properti ->
                         GedungItemCard(
                             properti = properti,
+                            canManage = properti.bolehUbah || isGlobalRole,
                             enabled = !uiState.isSubmitting,
                             onOpen = { onSelect(properti.id) },
                             onEdit = { editTarget = properti },
@@ -334,6 +338,7 @@ fun PropertiPickerScreen(
 @Composable
 private fun GedungItemCard(
     properti: PropertiDto,
+    canManage: Boolean,
     enabled: Boolean,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
@@ -461,7 +466,7 @@ private fun GedungItemCard(
                     )
                 }
 
-                if (properti.bolehUbah) {
+                if (canManage) {
                     OutlinedIconButton(
                         onClick = onEdit,
                         enabled = enabled,

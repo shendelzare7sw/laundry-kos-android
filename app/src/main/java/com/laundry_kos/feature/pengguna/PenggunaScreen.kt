@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -149,50 +150,61 @@ fun PenggunaScreen(
                     }
                 } else if (data != null) {
                     items(data.data, key = { it.id }) { user ->
-                        LaundryCard(contentPadding = PaddingValues(14.dp)) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
+                        LaundryCard(
+                            modifier = Modifier.clickable(enabled = user.bolehUbah) { resetTarget = user },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
                                         Text(user.name, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
-                                        Text(
-                                            text = "@${user.username} · ${user.roleLabel.ifBlank { user.role }}" +
-                                                (user.propertiNama?.let { " · $it" } ?: ""),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = ext.muted,
+                                        StatusBadge(
+                                            text = if (user.aktif) "Aktif" else "Nonaktif",
+                                            containerColor = if (user.aktif) ext.okContainer else ext.dangerContainer,
+                                            contentColor = if (user.aktif) ext.ok else ext.danger,
                                         )
                                     }
-                                    StatusBadge(
-                                        text = if (user.aktif) "Aktif" else "Nonaktif",
-                                        containerColor = if (user.aktif) ext.okContainer else ext.dangerContainer,
-                                        contentColor = if (user.aktif) ext.ok else ext.danger,
+                                    Text(
+                                        text = "@${user.username} · ${user.roleLabel.ifBlank { user.role }}" +
+                                            (user.propertiNama?.let { " · $it" } ?: ""),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ext.muted,
                                     )
                                 }
 
                                 if (user.bolehUbah) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = { toggleTarget = user },
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(10.dp),
-                                        ) {
-                                            Text(if (user.aktif) "Nonaktifkan" else "Aktifkan")
-                                        }
-                                        OutlinedButton(
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
                                             onClick = { resetTarget = user },
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ext.onGold),
+                                            modifier = Modifier.size(36.dp),
                                         ) {
-                                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(15.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Reset Sandi")
+                                            Icon(
+                                                Icons.Default.Key,
+                                                contentDescription = "Reset Sandi",
+                                                tint = ext.onGold,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { toggleTarget = user },
+                                            modifier = Modifier.size(36.dp),
+                                        ) {
+                                            Icon(
+                                                Icons.Default.PowerSettingsNew,
+                                                contentDescription = if (user.aktif) "Nonaktifkan" else "Aktifkan",
+                                                tint = if (user.aktif) ext.danger else ext.ok,
+                                                modifier = Modifier.size(19.dp),
+                                            )
                                         }
                                     }
                                 }

@@ -407,32 +407,23 @@ private fun PeringatanKuotaCard(
                     modifier = Modifier.weight(1f),
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (!item.waUrl.isNullOrBlank()) {
-                        Button(
-                            onClick = onSendWa,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = ext.whatsapp,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ),
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_whatsapp),
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("WA", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = onClick,
+                if (!item.waUrl.isNullOrBlank()) {
+                    Button(
+                        onClick = onSendWa,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ext.whatsapp,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
                     ) {
-                        Text("Detail", style = MaterialTheme.typography.labelMedium)
+                        Icon(
+                            painter = painterResource(R.drawable.ic_whatsapp),
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("WA", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }

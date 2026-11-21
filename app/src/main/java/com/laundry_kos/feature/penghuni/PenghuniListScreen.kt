@@ -242,7 +242,7 @@ private fun PenghuniItemCard(
 
     LaundryCard(
         modifier = Modifier.clickable(onClick = onClick),
-        contentPadding = PaddingValues(14.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(

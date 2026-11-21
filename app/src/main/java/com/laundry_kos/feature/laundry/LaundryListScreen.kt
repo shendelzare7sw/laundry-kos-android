@@ -24,9 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
@@ -550,107 +549,126 @@ private fun LaundryRowCard(
 ) {
     val ext = LaundryKosTheme.extendedColors
     val cardBg = if (item.lewatKuota) ext.dangerContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surface
+    val judul = when (item.jenis) {
+        "penghuni" -> {
+            val kamar = item.kamarNomor?.let { "Kamar $it · " } ?: ""
+            "$kamar${item.penghuniNama ?: "Penghuni"}"
+        }
+        "gedung" -> "GDG · Laundry Gedung"
+        else -> "Tanpa Nama"
+    }
+    val biayaLabel = if (item.biayaUtama != null) {
+        Formatters.formatRupiah(item.biayaUtama) + if (item.biayaManual) "*" else ""
+    } else {
+        if (item.beratCenti != null) "Belum diisi" else "-"
+    }
 
-    LaundryCard(containerColor = cardBg, contentPadding = PaddingValues(14.dp)) {
+    // Mobile-first: ketuk langsung pada kartu untuk melihat/mengubah catatan (tanpa ikon pensil)
+    LaundryCard(
+        modifier = Modifier.clickable(enabled = item.bolehUbah, onClick = onEdit),
+        containerColor = cardBg,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    val judul = when (item.jenis) {
-                        "penghuni" -> {
-                            val kamar = item.kamarNomor?.let { "Kamar $it · " } ?: ""
-                            "$kamar${item.penghuniNama ?: "Penghuni"}"
+                // Kiri: Judul + metadata ringkas (tanggal · berat · pencatat)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = judul,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (item.lewatKuota) ext.danger else MaterialTheme.colorScheme.onSurface,
+                        )
+                        if (item.lewatKuota) {
+                            StatusBadge(
+                                text = "Lewat",
+                                containerColor = ext.dangerContainer,
+                                contentColor = ext.danger,
+                            )
+                        } else if (item.jenis != "penghuni") {
+                            StatusBadge(
+                                text = item.jenisLabel.ifBlank { item.jenis },
+                                containerColor = ext.goldContainer,
+                                contentColor = ext.onGold,
+                            )
                         }
-                        "gedung" -> "GDG · Laundry Gedung"
-                        else -> "Tanpa Nama"
                     }
-                    Text(
-                        text = judul,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = if (item.lewatKuota) ext.danger else MaterialTheme.colorScheme.onSurface,
-                    )
+
+                    val beratText = Formatters.formatBeratKg(item.beratCenti, item.beratLabel)
                     Text(
                         text = buildString {
                             append(DateUtil.formatIsoDateLabel(item.tanggal))
-                            item.dicatatOlehNama?.let { append(" · oleh $it") }
+                            if (beratText != "-") append(" · $beratText")
+                            item.dicatatOlehNama?.let { append(" · $it") }
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = ext.muted,
                     )
                 }
 
-                if (item.lewatKuota) {
-                    StatusBadge(
-                        text = "Lewat Kuota",
-                        containerColor = ext.dangerContainer,
-                        contentColor = ext.danger,
-                    )
-                } else if (item.jenis != "penghuni") {
-                    StatusBadge(
-                        text = item.jenisLabel.ifBlank { item.jenis },
-                        containerColor = ext.goldContainer,
-                        contentColor = ext.onGold,
-                    )
+                // Kanan: Harga sejajar dengan ikon hapus ringkas (tanpa baris aksi bawah terpisah)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = biayaLabel,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = if (item.biayaUtama == null && item.beratCenti != null) ext.warn else MaterialTheme.colorScheme.primary,
+                        )
+                        if (item.itemBiaya > 0) {
+                            Text(
+                                text = "+${Formatters.formatRupiah(item.itemBiaya)}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = ext.onGold,
+                            )
+                        }
+                    }
+
+                    if (item.bolehHapus) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(34.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "Hapus",
+                                tint = ext.danger.copy(alpha = 0.85f),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Berat: ${Formatters.formatBeratKg(item.beratCenti, item.beratLabel)}",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                )
-                val biayaLabel = if (item.biayaUtama != null) {
-                    Formatters.formatRupiah(item.biayaUtama) + if (item.biayaManual) " (manual)" else ""
-                } else {
-                    if (item.beratCenti != null) "Harga belum diisi" else "-"
-                }
-                Text(
-                    text = biayaLabel,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (item.biayaUtama == null && item.beratCenti != null) ext.warn else MaterialTheme.colorScheme.primary,
-                )
-            }
-
+            // Strip ringkas item terpisah jika ada
             if (item.item.isNotEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = ext.goldContainer.copy(alpha = 0.6f),
+                    color = ext.goldContainer.copy(alpha = 0.65f),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        Text(
-                            text = "Item Terpisah (${Formatters.formatRupiah(item.itemBiaya)}):",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = ext.onGold,
-                        )
-                        item.item.forEach { sub ->
-                            val beratPart = sub.beratLabel?.let { " ($it kg)" } ?: ""
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    text = "• ${sub.nama} x${sub.jumlah}$beratPart",
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                                Text(
-                                    text = Formatters.formatRupiah(sub.biaya),
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                )
-                            }
-                        }
+                    val ringkasItem = item.item.joinToString(", ") { sub ->
+                        val qty = if (sub.jumlah > 1) " x${sub.jumlah}" else ""
+                        "${sub.nama}$qty (${Formatters.formatRupiah(sub.biaya)})"
                     }
+                    Text(
+                        text = "Terpisah: $ringkasItem",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ext.onGold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                    )
                 }
             }
 
@@ -662,28 +680,18 @@ private fun LaundryRowCard(
                 )
             }
 
-            if (item.bolehUbah || item.bolehHapus || item.bolehTetapkanPemilik) {
+            if (item.bolehTetapkanPemilik) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (item.bolehTetapkanPemilik) {
-                        TextButton(onClick = onTetapkanPemilik) {
-                            Icon(Icons.Default.PersonAddAlt1, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Tetapkan Pemilik")
-                        }
-                    }
-                    if (item.bolehUbah) {
-                        IconButton(onClick = onEdit) {
-                            Icon(Icons.Default.Edit, contentDescription = "Ubah", tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    if (item.bolehHapus) {
-                        IconButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = ext.danger)
-                        }
+                    TextButton(
+                        onClick = onTetapkanPemilik,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Icon(Icons.Default.PersonAddAlt1, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Tetapkan Pemilik", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
