@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Laundry-Kos</string>
+    <string name="app_tagline">Catatan Laundry &amp; Kuota Kos</string>
+    <string name="nav_beranda">Beranda</string>
+    <string name="nav_laundry">Laundry</string>
+    <string name="nav_penghuni">Penghuni</string>
+    <string name="nav_laporan">Laporan</string>
+    <string name="nav_pengaturan">Pengaturan</string>
+    <string name="aksi_lihat_lebih_banyak">Lihat lebih banyak</string>
+    <string name="aksi_coba_lagi">Coba lagi</string>
+    <string name="aksi_batal">Batal</string>
+    <string name="aksi_simpan">Simpan</string>
+</resources>

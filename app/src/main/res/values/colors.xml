@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Maroon (resources/css/app.css) -->
+    <color name="maroon">#8B1A1A</color>
+    <color name="maroon_dark">#6E1414</color>
+    <color name="maroon_darker">#520E0E</color>
+    <color name="maroon_cerah">#A11D1D</color>
+    <color name="maroon_strong">#C42626</color>
+
+    <!-- Brand Gold -->
+    <color name="gold">#C8920E</color>
+    <color name="gold_bright">#D4A017</color>
+    <color name="gold_soft">#E8C25A</color>
+    <color name="gold_container">#FBF1D8</color>
+    <color name="on_gold">#6B4E08</color>
+
+    <!-- Neutral & Surfaces -->
+    <color name="bg_cream">#F9F5F0</color>
+    <color name="surface_white">#FFFFFF</color>
+    <color name="surface_alt">#FCFAF6</color>
+    <color name="surface_sunken">#F1EBE2</color>
+    <color name="line">#ECE5DB</color>
+    <color name="line_strong">#E0D7C9</color>
+
+    <!-- Typography -->
+    <color name="ink">#1C1C1C</color>
+    <color name="muted">#6B7280</color>
+    <color name="subtle">#9A938A</color>
+
+    <!-- Semantic Status -->
+    <color name="status_ok">#16A34A</color>
+    <color name="status_warn">#CA8A04</color>
+    <color name="status_danger">#DC2626</color>
+    <color name="status_info">#2563EB</color>
+
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

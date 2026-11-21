@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tetap menjaga identitas tema krem-marun konsisten dengan web Laundry-Kos -->
+    <style name="Theme.Laundrykos" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/maroon</item>
+        <item name="android:colorPrimaryDark">@color/maroon_dark</item>
+        <item name="android:colorAccent">@color/gold</item>
+        <item name="android:windowBackground">@color/bg_cream</item>
+        <item name="android:statusBarColor">@color/maroon</item>
+        <item name="android:navigationBarColor">@color/surface_white</item>
+    </style>
+</resources>

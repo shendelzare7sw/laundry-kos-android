@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Kecualikan DataStore token Sanctum agar kredensial tidak ikut ter-backup ke cloud -->
+    <exclude
+        domain="file"
+        path="datastore/laundry_kos_session.preferences_pb" />
+</full-backup-content>
