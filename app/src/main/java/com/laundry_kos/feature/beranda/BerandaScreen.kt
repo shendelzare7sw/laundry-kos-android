@@ -1,5 +1,6 @@
 package com.laundry_kos.feature.beranda
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.LocalLaundryService
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,6 +28,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -43,7 +47,6 @@ import com.laundry_kos.core.designsystem.KuotaProgressBar
 import com.laundry_kos.core.designsystem.KuotaVisualStatus
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
-import com.laundry_kos.core.designsystem.MaroonPrimaryButton
 import com.laundry_kos.core.designsystem.MonthSelectorBar
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
@@ -58,6 +61,8 @@ fun BerandaScreen(
     viewModel: BerandaViewModel,
     permissions: PermissionsDto,
     onCatatLaundry: () -> Unit,
+    onOpenLaundryList: () -> Unit,
+    onOpenPenghuniList: () -> Unit,
     onOpenPenghuniDetail: (Int) -> Unit,
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
@@ -82,31 +87,72 @@ fun BerandaScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // 3 Tombol Aksi Cepat persis beranda/index.blade.php (+ Catat, Laundry, Penghuni)
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (permissions.catatLaundry) {
+                        Button(
+                            onClick = onCatatLaundry,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(999.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Catat", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = onOpenLaundryList,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(999.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        border = BorderStroke(1.dp, ext.lineStrong),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    ) {
+                        Icon(Icons.Default.LocalLaundryService, contentDescription = null, modifier = Modifier.size(15.dp), tint = ext.muted)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Laundry", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                    }
+                    OutlinedButton(
+                        onClick = onOpenPenghuniList,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(999.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        border = BorderStroke(1.dp, ext.lineStrong),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    ) {
+                        Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(15.dp), tint = ext.muted)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Penghuni", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                    }
+                }
+            }
+
             item {
                 MonthSelectorBar(
                     bulanYm = uiState.bulan,
                     onChangeBulan = viewModel::changeBulan,
                 )
-            }
-
-            if (permissions.catatLaundry) {
-                item {
-                    Button(
-                        onClick = onCatatLaundry,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Catat Laundry Baru", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
             }
 
             if (uiState.error != null) {
@@ -138,8 +184,9 @@ fun BerandaScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             KpiMetricCard(
-                                label = "Total Biaya Utama",
+                                label = "Biaya Utama",
                                 value = Formatters.formatRupiah(r.totalBiayaUtama),
+                                valueColor = ext.ok,
                                 modifier = Modifier.weight(1f),
                             )
                             KpiMetricCard(
@@ -172,8 +219,9 @@ fun BerandaScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
                                 KpiMetricCard(
-                                    label = "Total Biaya Utama",
+                                    label = "Biaya Utama",
                                     value = Formatters.formatRupiah(r.totalBiayaUtama),
+                                    valueColor = ext.ok,
                                     modifier = Modifier.weight(1f),
                                 )
                                 KpiMetricCard(
@@ -192,7 +240,7 @@ fun BerandaScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 6.dp),
+                            .padding(top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
@@ -359,23 +407,32 @@ private fun PeringatanKuotaCard(
                     modifier = Modifier.weight(1f),
                 )
 
-                if (!item.waUrl.isNullOrBlank()) {
-                    Button(
-                        onClick = onSendWa,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (!item.waUrl.isNullOrBlank()) {
+                        Button(
+                            onClick = onSendWa,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ext.whatsapp,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_whatsapp),
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("WA", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = onClick,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ext.whatsapp,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_whatsapp),
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("WA", style = MaterialTheme.typography.labelMedium)
+                        Text("Detail", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }

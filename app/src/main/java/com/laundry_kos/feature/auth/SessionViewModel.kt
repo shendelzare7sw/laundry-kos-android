@@ -13,7 +13,6 @@ import com.laundry_kos.data.repository.LaundryKosRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface SessionUiState {
@@ -30,6 +29,7 @@ sealed interface SessionUiState {
         val propertiList: List<PropertiDto>,
         val message: String? = null,
         val isSubmitting: Boolean = false,
+        val isRefreshing: Boolean = false,
     ) : SessionUiState
 
     data class Authenticated(
@@ -37,8 +37,6 @@ sealed interface SessionUiState {
         val propertiAktif: PropertiDto,
         val propertiList: List<PropertiDto>,
         val permissions: PermissionsDto,
-        val showPropertiSwitcher: Boolean = false,
-        val isSwitchingProperti: Boolean = false,
     ) : SessionUiState
 }
 
@@ -56,6 +54,9 @@ class SessionViewModel(
         bootstrap()
     }
 
+    private fun isGlobalRole(user: UserDto): Boolean =
+        user.role == "owner" || user.role == "dev_admin"
+
     private fun observeGlobalEvents() {
         viewModelScope.launch {
             repository.eventBus.events.collect { event ->
@@ -71,6 +72,7 @@ class SessionViewModel(
                             else -> null
                         }
                         if (currentUser != null) {
+                            repository.sessionStore.savePropertiId(null)
                             _state.value = SessionUiState.SelectProperti(
                                 user = currentUser,
                                 propertiList = event.propertiList,
@@ -93,19 +95,30 @@ class SessionViewModel(
             }
 
             when (val res = repository.fetchMe()) {
-                is ApiResult.Success -> applyMeResult(
-                    user = res.data.user,
-                    propertiAktif = res.data.propertiAktif,
-                    propertiList = res.data.propertiList,
-                    permissions = res.data.permissions,
-                )
+                is ApiResult.Success -> {
+                    val user = res.data.user
+                    // Sesuai workflow web (AuthenticatedSessionController & PastikanPropertiAktif):
+                    // Owner / DevAdmin tanpa properti terpilih di sesi tetap mendarat di layar Pilih Gedung.
+                    if (isGlobalRole(user) && saved.propertiId == null) {
+                        repository.sessionStore.savePropertiId(null)
+                        _state.value = SessionUiState.SelectProperti(
+                            user = user,
+                            propertiList = res.data.propertiList,
+                        )
+                    } else {
+                        applyAuthenticatedOrPicker(
+                            user = user,
+                            propertiAktif = res.data.propertiAktif,
+                            propertiList = res.data.propertiList,
+                            permissions = res.data.permissions,
+                        )
+                    }
+                }
                 is ApiResult.Failure -> {
                     if (res.error.isUnauthorized || res.error.isForbiddenBlocked) {
                         repository.sessionStore.clearSession()
-                        _state.value = SessionUiState.Unauthenticated(bannerMessage = res.error.message)
-                    } else {
-                        _state.value = SessionUiState.Unauthenticated(bannerMessage = res.error.message)
                     }
+                    _state.value = SessionUiState.Unauthenticated(bannerMessage = res.error.message)
                 }
             }
         }
@@ -115,12 +128,25 @@ class SessionViewModel(
         viewModelScope.launch {
             _state.value = SessionUiState.Unauthenticated(isLoggingIn = true)
             when (val res = repository.login(username, password)) {
-                is ApiResult.Success -> applyMeResult(
-                    user = res.data.user,
-                    propertiAktif = res.data.propertiAktif,
-                    propertiList = res.data.propertiList,
-                    permissions = res.data.permissions,
-                )
+                is ApiResult.Success -> {
+                    val user = res.data.user
+                    // Persis AuthenticatedSessionController::store di Laravel Web:
+                    // Owner & DevAdmin SELALU diarahkan ke Pilih Gedung dahulu setelah login!
+                    if (isGlobalRole(user)) {
+                        repository.sessionStore.savePropertiId(null)
+                        _state.value = SessionUiState.SelectProperti(
+                            user = user,
+                            propertiList = res.data.propertiList,
+                        )
+                    } else {
+                        applyAuthenticatedOrPicker(
+                            user = user,
+                            propertiAktif = res.data.propertiAktif,
+                            propertiList = res.data.propertiList,
+                            permissions = res.data.permissions,
+                        )
+                    }
+                }
                 is ApiResult.Failure -> {
                     _state.value = SessionUiState.Unauthenticated(
                         isLoggingIn = false,
@@ -131,57 +157,65 @@ class SessionViewModel(
         }
     }
 
+    fun refreshPropertiList() {
+        val current = _state.value as? SessionUiState.SelectProperti ?: return
+        viewModelScope.launch {
+            _state.value = current.copy(isRefreshing = true, message = null)
+            when (val res = repository.fetchProperti()) {
+                is ApiResult.Success -> {
+                    _state.value = current.copy(
+                        propertiList = res.data.data,
+                        isRefreshing = false,
+                        message = null,
+                    )
+                }
+                is ApiResult.Failure -> {
+                    _state.value = current.copy(
+                        isRefreshing = false,
+                        message = res.error.summaryMessage(),
+                    )
+                }
+            }
+        }
+    }
+
     fun selectProperti(propertiId: Int) {
         viewModelScope.launch {
-            when (val current = _state.value) {
-                is SessionUiState.SelectProperti -> {
-                    _state.value = current.copy(isSubmitting = true, message = null)
-                }
-                is SessionUiState.Authenticated -> {
-                    _state.value = current.copy(isSwitchingProperti = true)
-                }
-                else -> Unit
+            val current = _state.value
+            if (current is SessionUiState.SelectProperti) {
+                _state.value = current.copy(isSubmitting = true, message = null)
             }
 
             when (val res = repository.selectProperti(propertiId)) {
-                is ApiResult.Success -> applyMeResult(
+                is ApiResult.Success -> applyAuthenticatedOrPicker(
                     user = res.data.user,
                     propertiAktif = res.data.propertiAktif,
                     propertiList = res.data.propertiList,
                     permissions = res.data.permissions,
                 )
                 is ApiResult.Failure -> {
-                    when (val current = _state.value) {
-                        is SessionUiState.SelectProperti -> {
-                            _state.value = current.copy(isSubmitting = false, message = res.error.message)
-                        }
-                        is SessionUiState.Authenticated -> {
-                            _state.value = current.copy(isSwitchingProperti = false, showPropertiSwitcher = false)
-                        }
-                        else -> Unit
+                    if (current is SessionUiState.SelectProperti) {
+                        _state.value = current.copy(isSubmitting = false, message = res.error.message)
                     }
                 }
             }
         }
     }
 
-    fun openPropertiSwitcher() {
-        _state.update { current ->
-            if (current is SessionUiState.Authenticated && current.propertiList.size > 1) {
-                current.copy(showPropertiSwitcher = true)
-            } else {
-                current
-            }
-        }
-    }
-
-    fun dismissPropertiSwitcher() {
-        _state.update { current ->
-            if (current is SessionUiState.Authenticated) {
-                current.copy(showPropertiSwitcher = false)
-            } else {
-                current
-            }
+    /**
+     * Persis `POST /properti/lepas` di Laravel Web: lepas konteks properti aktif
+     * dan kembalikan Owner/DevAdmin ke halaman Pilih Gedung.
+     */
+    fun releaseProperti() {
+        val current = _state.value as? SessionUiState.Authenticated ?: return
+        if (!isGlobalRole(current.user)) return
+        viewModelScope.launch {
+            repository.sessionStore.savePropertiId(null)
+            _state.value = SessionUiState.SelectProperti(
+                user = current.user,
+                propertiList = current.propertiList,
+            )
+            refreshPropertiList()
         }
     }
 
@@ -198,7 +232,7 @@ class SessionViewModel(
         }
     }
 
-    private fun applyMeResult(
+    private fun applyAuthenticatedOrPicker(
         user: UserDto,
         propertiAktif: PropertiDto?,
         propertiList: List<PropertiDto>,
@@ -211,7 +245,7 @@ class SessionViewModel(
                 message = if (propertiList.isEmpty()) {
                     "Belum ada properti aktif yang dapat diakses akun ini."
                 } else {
-                    "Pilih properti aktif terlebih dahulu."
+                    "Silakan pilih gedung/properti terlebih dahulu."
                 },
             )
         } else {

@@ -1,50 +1,76 @@
 package com.laundry_kos.navigation
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalLaundryService
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -60,7 +86,6 @@ import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.data.repository.LaundryKosRepository
 import com.laundry_kos.feature.auth.LoginScreen
 import com.laundry_kos.feature.auth.PropertiPickerScreen
-import com.laundry_kos.feature.auth.PropertiSwitcherDialog
 import com.laundry_kos.feature.auth.SessionUiState
 import com.laundry_kos.feature.auth.SessionViewModel
 import com.laundry_kos.feature.beranda.BerandaScreen
@@ -71,14 +96,18 @@ import com.laundry_kos.feature.laundry.LaundryFormScreen
 import com.laundry_kos.feature.laundry.LaundryFormViewModel
 import com.laundry_kos.feature.laundry.LaundryListScreen
 import com.laundry_kos.feature.laundry.LaundryListViewModel
+import com.laundry_kos.feature.notifikasi.NotifikasiViewModel
+import com.laundry_kos.feature.notifikasi.NotificationBellButton
+import com.laundry_kos.feature.notifikasi.NotificationListDialog
 import com.laundry_kos.feature.pengaturan.PengaturanScreen
 import com.laundry_kos.feature.pengaturan.PengaturanViewModel
 import com.laundry_kos.feature.penghuni.PenghuniDetailScreen
 import com.laundry_kos.feature.penghuni.PenghuniDetailViewModel
 import com.laundry_kos.feature.penghuni.PenghuniListScreen
 import com.laundry_kos.feature.penghuni.PenghuniListViewModel
+import kotlinx.coroutines.launch
 
-private enum class MainTab(
+private enum class OperasionalTab(
     val route: String,
     val labelRes: Int,
     val icon: ImageVector,
@@ -87,9 +116,9 @@ private enum class MainTab(
     LAUNDRY("laundry", R.string.nav_laundry, Icons.Default.LocalLaundryService),
     PENGHUNI("penghuni", R.string.nav_penghuni, Icons.Default.Groups),
     LAPORAN("laporan", R.string.nav_laporan, Icons.Default.Assessment),
-    PENGATURAN("pengaturan", R.string.nav_pengaturan, Icons.Default.Settings),
 }
 
+private const val ROUTE_PENGATURAN = "pengaturan"
 private const val ROUTE_LAUNDRY_NEW = "laundry/new"
 private const val ROUTE_LAUNDRY_EDIT = "laundry/edit/{id}"
 private const val ROUTE_PENGHUNI_DETAIL = "penghuni/detail/{id}"
@@ -120,6 +149,7 @@ fun LaundryKosRoot(
             PropertiPickerScreen(
                 uiState = state,
                 onSelect = sessionViewModel::selectProperti,
+                onRefresh = sessionViewModel::refreshPropertiList,
                 onLogout = sessionViewModel::logout,
             )
         }
@@ -128,9 +158,7 @@ fun LaundryKosRoot(
                 AuthenticatedAppShell(
                     authState = state,
                     repository = repository,
-                    onOpenPropertiSwitcher = sessionViewModel::openPropertiSwitcher,
-                    onSelectProperti = sessionViewModel::selectProperti,
-                    onDismissPropertiSwitcher = sessionViewModel::dismissPropertiSwitcher,
+                    onReleaseProperti = sessionViewModel::releaseProperti,
                     onLogout = sessionViewModel::logout,
                 )
             }
@@ -143,32 +171,36 @@ fun LaundryKosRoot(
 private fun AuthenticatedAppShell(
     authState: SessionUiState.Authenticated,
     repository: LaundryKosRepository,
-    onOpenPropertiSwitcher: () -> Unit,
-    onSelectProperti: (Int) -> Unit,
-    onDismissPropertiSwitcher: () -> Unit,
+    onReleaseProperti: () -> Unit,
     onLogout: () -> Unit,
 ) {
     val navController = rememberNavController()
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route
-    val isMainTab = MainTab.entries.any { it.route == currentRoute }
+    val isShellRoute = OperasionalTab.entries.any { it.route == currentRoute } || currentRoute == ROUTE_PENGATURAN
     val isWideLayout = rememberIsWideLayout()
     val ext = LaundryKosTheme.extendedColors
-    val canSwitchProperti = authState.propertiList.size > 1
+
+    val isGlobalRole = authState.user.role == "owner" || authState.user.role == "dev_admin"
     val bolehKelolaPengaturan = authState.permissions.kelolaPengaturan
 
-    fun tabLabel(tab: MainTab): String = when {
-        tab == MainTab.PENGATURAN && !bolehKelolaPengaturan -> "Akun"
-        else -> ""
-    }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    var showNotifDialog by remember { mutableStateOf(false) }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
 
-    fun tabIcon(tab: MainTab): ImageVector = when {
-        tab == MainTab.PENGATURAN && !bolehKelolaPengaturan -> Icons.Default.Person
-        else -> tab.icon
-    }
+    val notifikasiViewModel: NotifikasiViewModel = viewModel(
+        key = "notifikasi_${authState.propertiAktif.id}",
+        factory = NotifikasiViewModel.Factory(
+            repository = repository,
+            propertiAktif = authState.propertiAktif,
+            isGlobalRole = isGlobalRole,
+        ),
+    )
+    val notifications by notifikasiViewModel.notifications.collectAsStateWithLifecycle()
 
-    fun navigateToTab(tab: MainTab) {
-        navController.navigate(tab.route) {
+    fun navigateTopLevel(route: String) {
+        navController.navigate(route) {
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
             }
@@ -177,78 +209,318 @@ private fun AuthenticatedAppShell(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        // Hindari double statusBar/navBar insets pada screen detail/form yang sudah memiliki Scaffold sendiri
-        contentWindowInsets = if (isMainTab) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
-        topBar = {
-            if (isMainTab) {
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.clickable(enabled = canSwitchProperti) {
-                                onOpenPropertiSwitcher()
-                            },
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_laundry_mark),
-                                contentDescription = stringResource(R.string.app_name),
-                                modifier = Modifier.size(30.dp),
+    val pageTitle = when (currentRoute) {
+        OperasionalTab.BERANDA.route -> "Beranda"
+        OperasionalTab.LAUNDRY.route -> "Laundry"
+        OperasionalTab.PENGHUNI.route -> "Penghuni"
+        OperasionalTab.LAPORAN.route -> "Laporan Laundry"
+        ROUTE_PENGATURAN -> if (bolehKelolaPengaturan) "Pengaturan" else "Akun & Sesi"
+        else -> authState.propertiAktif.nama
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = isShellRoute,
+        drawerContent = {
+            // Sidebar Marun Gelap persis `layouts/app.blade.php`
+            ModalDrawerSheet(
+                drawerContainerColor = ext.maroonDark,
+                drawerContentColor = Color.White,
+                modifier = Modifier.width(292.dp),
+            ) {
+                Column(modifier = Modifier.fillMaxHeight()) {
+                    // Header Brand
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_laundry_mark),
+                            contentDescription = stringResource(R.string.app_name),
+                            modifier = Modifier.size(38.dp),
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.app_name).uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp,
+                                ),
+                                color = ext.goldSoft,
                             )
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = authState.propertiAktif.nama,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+                            Text(
+                                text = authState.propertiAktif.nama,
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = "OPERASIONAL",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                            ),
+                            color = Color.White.copy(alpha = 0.50f),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        )
+
+                        OperasionalTab.entries.forEach { tab ->
+                            val selected = currentRoute == tab.route
+                            NavigationDrawerItem(
+                                selected = selected,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    navigateTopLevel(tab.route)
+                                },
+                                icon = {
+                                    Icon(
+                                        tab.icon,
+                                        contentDescription = null,
+                                        tint = if (selected) ext.goldSoft else Color.White.copy(alpha = 0.7f),
                                     )
-                                    if (canSwitchProperti) {
-                                        Icon(
-                                            Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Ganti properti",
-                                            tint = ext.goldSoft,
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                }
+                                },
+                                label = {
+                                    Text(
+                                        text = stringResource(tab.labelRes),
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    )
+                                },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    selectedContainerColor = Color.White.copy(alpha = 0.15f),
+                                    selectedTextColor = Color.White,
+                                    unselectedContainerColor = Color.Transparent,
+                                    unselectedTextColor = Color.White.copy(alpha = 0.85f),
+                                ),
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Text(
+                            text = "MANAJEMEN",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                            ),
+                            color = Color.White.copy(alpha = 0.50f),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        )
+
+                        // Owner & DevAdmin: kembali ke Pilih Gedung (persis `properti.lepas` di web)
+                        if (isGlobalRole) {
+                            NavigationDrawerItem(
+                                selected = false,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    onReleaseProperti()
+                                },
+                                icon = {
+                                    Icon(
+                                        Icons.Default.Apartment,
+                                        contentDescription = null,
+                                        tint = ext.goldSoft,
+                                    )
+                                },
+                                label = { Text("Ganti / Pilih Gedung", fontWeight = FontWeight.Medium) },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedContainerColor = Color.Transparent,
+                                    unselectedTextColor = Color.White.copy(alpha = 0.90f),
+                                ),
+                            )
+                        }
+
+                        // Pengaturan (Admin/Owner/DevAdmin) atau Akun & Sesi (Penjaga)
+                        val settingSelected = currentRoute == ROUTE_PENGATURAN
+                        NavigationDrawerItem(
+                            selected = settingSelected,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                navigateTopLevel(ROUTE_PENGATURAN)
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (bolehKelolaPengaturan) Icons.Default.Settings else Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = if (settingSelected) ext.goldSoft else Color.White.copy(alpha = 0.7f),
+                                )
+                            },
+                            label = {
                                 Text(
-                                    text = "${authState.user.name} · ${authState.user.roleLabel.ifBlank { authState.user.role }}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ext.goldSoft,
+                                    text = if (bolehKelolaPengaturan) "Pengaturan & Akun" else "Akun & Sesi",
+                                    fontWeight = if (settingSelected) FontWeight.Bold else FontWeight.Medium,
+                                )
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                selectedContainerColor = Color.White.copy(alpha = 0.15f),
+                                selectedTextColor = Color.White,
+                                unselectedContainerColor = Color.Transparent,
+                                unselectedTextColor = Color.White.copy(alpha = 0.85f),
+                            ),
+                        )
+                    }
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+
+                    // Footer User & Logout
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = ext.goldSoft,
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = authState.user.name.take(1).uppercase(),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = ext.maroonDarker,
                                 )
                             }
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    ),
-                )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = authState.user.name,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = authState.user.roleLabel.ifBlank { authState.user.role },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f),
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                showLogoutConfirm = true
+                            },
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = "Keluar",
+                                tint = ext.goldSoft,
+                            )
+                        }
+                    }
+                }
             }
         },
-        bottomBar = {
-            if (isMainTab && !isWideLayout) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 0.dp,
-                ) {
-                    MainTab.entries.forEach { tab ->
-                        val selected = currentRoute == tab.route
-                        val label = tabLabel(tab).ifEmpty { stringResource(tab.labelRes) }
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = { navigateToTab(tab) },
-                            icon = { Icon(tabIcon(tab), contentDescription = label) },
-                            label = {
+    ) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = if (isShellRoute) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
+            topBar = {
+                if (isShellRoute) {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(
+                                    Icons.Default.Menu,
+                                    contentDescription = "Buka menu navigasi",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                        },
+                        title = {
+                            Column {
                                 Text(
-                                    text = label,
+                                    text = pageTitle,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                            },
+                                Text(
+                                    text = authState.propertiAktif.nama,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ext.goldSoft,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        },
+                        actions = {
+                            NotificationBellButton(
+                                count = notifications.size,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                onClick = {
+                                    notifikasiViewModel.refresh()
+                                    showNotifDialog = true
+                                },
+                            )
+                            if (isGlobalRole) {
+                                IconButton(onClick = onReleaseProperti) {
+                                    Icon(
+                                        Icons.Default.SwapHoriz,
+                                        contentDescription = "Ganti Gedung",
+                                        tint = ext.goldSoft,
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    )
+                }
+            },
+            bottomBar = {
+                // Persis `components/bottom-nav.blade.php`: Beranda | Laundry | Penghuni | Laporan | Menu (Drawer)
+                if (isShellRoute && !isWideLayout) {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                    ) {
+                        OperasionalTab.entries.forEach { tab ->
+                            val selected = currentRoute == tab.route
+                            val label = stringResource(tab.labelRes)
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { navigateTopLevel(tab.route) },
+                                icon = { Icon(tab.icon, contentDescription = label) },
+                                label = {
+                                    Text(
+                                        text = label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = ext.goldContainer,
+                                    unselectedIconColor = ext.muted,
+                                    unselectedTextColor = ext.muted,
+                                ),
+                            )
+                        }
+                        NavigationBarItem(
+                            selected = currentRoute == ROUTE_PENGATURAN,
+                            onClick = { scope.launch { drawerState.open() } },
+                            icon = { Icon(Icons.Default.Menu, contentDescription = "Menu") },
+                            label = { Text("Menu", maxLines = 1) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.primary,
                                 selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -259,33 +531,40 @@ private fun AuthenticatedAppShell(
                         )
                     }
                 }
-            }
-        },
-    ) { innerPadding ->
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            if (isMainTab && isWideLayout) {
-                NavigationRail(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxHeight(),
-                ) {
-                    MainTab.entries.forEach { tab ->
-                        val selected = currentRoute == tab.route
-                        val label = tabLabel(tab).ifEmpty { stringResource(tab.labelRes) }
+            },
+        ) { innerPadding ->
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                if (isShellRoute && isWideLayout) {
+                    NavigationRail(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxHeight(),
+                    ) {
+                        OperasionalTab.entries.forEach { tab ->
+                            val selected = currentRoute == tab.route
+                            val label = stringResource(tab.labelRes)
+                            NavigationRailItem(
+                                selected = selected,
+                                onClick = { navigateTopLevel(tab.route) },
+                                icon = { Icon(tab.icon, contentDescription = label) },
+                                label = { Text(label, maxLines = 1) },
+                                colors = NavigationRailItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = ext.goldContainer,
+                                    unselectedIconColor = ext.muted,
+                                    unselectedTextColor = ext.muted,
+                                ),
+                            )
+                        }
                         NavigationRailItem(
-                            selected = selected,
-                            onClick = { navigateToTab(tab) },
-                            icon = { Icon(tabIcon(tab), contentDescription = label) },
-                            label = {
-                                Text(
-                                    text = label,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
+                            selected = currentRoute == ROUTE_PENGATURAN,
+                            onClick = { scope.launch { drawerState.open() } },
+                            icon = { Icon(Icons.Default.Menu, contentDescription = "Menu") },
+                            label = { Text("Menu", maxLines = 1) },
                             colors = NavigationRailItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.primary,
                                 selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -296,176 +575,209 @@ private fun AuthenticatedAppShell(
                         )
                     }
                 }
-            }
 
-            NavHost(
-                navController = navController,
-                startDestination = MainTab.BERANDA.route,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-            ) {
-                composable(MainTab.BERANDA.route) { entry ->
-                    val vm: BerandaViewModel = viewModel(
-                        key = "beranda_${authState.propertiAktif.id}",
-                        factory = BerandaViewModel.Factory(repository),
-                    )
-                    val needsRefresh by entry.savedStateHandle
-                        .getStateFlow("refresh_data", false)
-                        .collectAsStateWithLifecycle()
-                    LaunchedEffect(needsRefresh) {
-                        if (needsRefresh) {
-                            vm.load(isRefresh = true)
-                            entry.savedStateHandle["refresh_data"] = false
-                        }
-                    }
-                    BerandaScreen(
-                        viewModel = vm,
-                        permissions = authState.permissions,
-                        onCatatLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
-                        onOpenPenghuniDetail = { id -> navController.navigate("penghuni/detail/$id") },
-                    )
-                }
-
-                composable(MainTab.LAUNDRY.route) { entry ->
-                    val vm: LaundryListViewModel = viewModel(
-                        key = "laundry_${authState.propertiAktif.id}",
-                        factory = LaundryListViewModel.Factory(repository),
-                    )
-                    val needsRefresh by entry.savedStateHandle
-                        .getStateFlow("refresh_data", false)
-                        .collectAsStateWithLifecycle()
-                    LaunchedEffect(needsRefresh) {
-                        if (needsRefresh) {
-                            vm.load(isRefresh = true)
-                            entry.savedStateHandle["refresh_data"] = false
-                        }
-                    }
-                    LaundryListScreen(
-                        viewModel = vm,
-                        permissions = authState.permissions,
-                        onAddLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
-                        onEditLaundry = { id -> navController.navigate("laundry/edit/$id") },
-                    )
-                }
-
-                composable(MainTab.PENGHUNI.route) {
-                    val vm: PenghuniListViewModel = viewModel(
-                        key = "penghuni_${authState.propertiAktif.id}",
-                        factory = PenghuniListViewModel.Factory(repository),
-                    )
-                    PenghuniListScreen(
-                        viewModel = vm,
-                        onOpenDetail = { id -> navController.navigate("penghuni/detail/$id") },
-                    )
-                }
-
-                composable(MainTab.LAPORAN.route) {
-                    val vm: LaporanViewModel = viewModel(
-                        key = "laporan_${authState.propertiAktif.id}",
-                        factory = LaporanViewModel.Factory(repository),
-                    )
-                    LaporanScreen(viewModel = vm)
-                }
-
-                composable(MainTab.PENGATURAN.route) {
-                    val vm: PengaturanViewModel? = if (bolehKelolaPengaturan) {
-                        viewModel(
-                            key = "pengaturan_${authState.propertiAktif.id}",
-                            factory = PengaturanViewModel.Factory(repository),
+                NavHost(
+                    navController = navController,
+                    startDestination = OperasionalTab.BERANDA.route,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    composable(OperasionalTab.BERANDA.route) { entry ->
+                        val vm: BerandaViewModel = viewModel(
+                            key = "beranda_${authState.propertiAktif.id}",
+                            factory = BerandaViewModel.Factory(repository),
                         )
-                    } else {
-                        null
-                    }
-                    PengaturanScreen(
-                        viewModel = vm,
-                        user = authState.user,
-                        propertiAktif = authState.propertiAktif,
-                        bolehKelolaPengaturan = bolehKelolaPengaturan,
-                        canSwitchProperti = canSwitchProperti,
-                        onSwitchProperti = onOpenPropertiSwitcher,
-                        onLogout = onLogout,
-                    )
-                }
-
-                composable(ROUTE_LAUNDRY_NEW) {
-                    val vm: LaundryFormViewModel = viewModel(
-                        factory = LaundryFormViewModel.Factory(repository, editId = null),
-                    )
-                    LaundryFormScreen(
-                        viewModel = vm,
-                        onBack = { navController.popBackStack() },
-                        onSaved = {
-                            navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
-                            navController.popBackStack()
-                        },
-                        onOpenExistingEdit = { existingId ->
-                            navController.navigate("laundry/edit/$existingId") {
-                                popUpTo(ROUTE_LAUNDRY_NEW) { inclusive = true }
+                        val needsRefresh by entry.savedStateHandle
+                            .getStateFlow("refresh_data", false)
+                            .collectAsStateWithLifecycle()
+                        LaunchedEffect(needsRefresh) {
+                            if (needsRefresh) {
+                                vm.load(isRefresh = true)
+                                notifikasiViewModel.refresh()
+                                entry.savedStateHandle["refresh_data"] = false
                             }
-                        },
-                    )
-                }
-
-                composable(
-                    route = ROUTE_LAUNDRY_EDIT,
-                    arguments = listOf(navArgument("id") { type = NavType.IntType }),
-                ) { entry ->
-                    val id = entry.arguments?.getInt("id") ?: return@composable
-                    val vm: LaundryFormViewModel = viewModel(
-                        key = "laundry_edit_$id",
-                        factory = LaundryFormViewModel.Factory(repository, editId = id),
-                    )
-                    LaundryFormScreen(
-                        viewModel = vm,
-                        onBack = { navController.popBackStack() },
-                        onSaved = {
-                            navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
-                            navController.popBackStack()
-                        },
-                        onOpenExistingEdit = { existingId ->
-                            navController.navigate("laundry/edit/$existingId") {
-                                popUpTo(ROUTE_LAUNDRY_EDIT) { inclusive = true }
-                            }
-                        },
-                    )
-                }
-
-                composable(
-                    route = ROUTE_PENGHUNI_DETAIL,
-                    arguments = listOf(navArgument("id") { type = NavType.IntType }),
-                ) { entry ->
-                    val id = entry.arguments?.getInt("id") ?: return@composable
-                    val vm: PenghuniDetailViewModel = viewModel(
-                        key = "penghuni_detail_$id",
-                        factory = PenghuniDetailViewModel.Factory(repository, penghuniId = id),
-                    )
-                    val needsRefresh by entry.savedStateHandle
-                        .getStateFlow("refresh_data", false)
-                        .collectAsStateWithLifecycle()
-                    LaunchedEffect(needsRefresh) {
-                        if (needsRefresh) {
-                            vm.load(isRefresh = true)
-                            entry.savedStateHandle["refresh_data"] = false
                         }
+                        BerandaScreen(
+                            viewModel = vm,
+                            permissions = authState.permissions,
+                            onCatatLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
+                            onOpenLaundryList = { navigateTopLevel(OperasionalTab.LAUNDRY.route) },
+                            onOpenPenghuniList = { navigateTopLevel(OperasionalTab.PENGHUNI.route) },
+                            onOpenPenghuniDetail = { id -> navController.navigate("penghuni/detail/$id") },
+                        )
                     }
-                    PenghuniDetailScreen(
-                        viewModel = vm,
-                        onBack = { navController.popBackStack() },
-                        onEditLaundry = { laundryId -> navController.navigate("laundry/edit/$laundryId") },
-                    )
+
+                    composable(OperasionalTab.LAUNDRY.route) { entry ->
+                        val vm: LaundryListViewModel = viewModel(
+                            key = "laundry_${authState.propertiAktif.id}",
+                            factory = LaundryListViewModel.Factory(repository),
+                        )
+                        val needsRefresh by entry.savedStateHandle
+                            .getStateFlow("refresh_data", false)
+                            .collectAsStateWithLifecycle()
+                        LaunchedEffect(needsRefresh) {
+                            if (needsRefresh) {
+                                vm.load(isRefresh = true)
+                                notifikasiViewModel.refresh()
+                                entry.savedStateHandle["refresh_data"] = false
+                            }
+                        }
+                        LaundryListScreen(
+                            viewModel = vm,
+                            permissions = authState.permissions,
+                            onAddLaundry = { navController.navigate(ROUTE_LAUNDRY_NEW) },
+                            onEditLaundry = { id -> navController.navigate("laundry/edit/$id") },
+                        )
+                    }
+
+                    composable(OperasionalTab.PENGHUNI.route) {
+                        val vm: PenghuniListViewModel = viewModel(
+                            key = "penghuni_${authState.propertiAktif.id}",
+                            factory = PenghuniListViewModel.Factory(repository),
+                        )
+                        PenghuniListScreen(
+                            viewModel = vm,
+                            onOpenDetail = { id -> navController.navigate("penghuni/detail/$id") },
+                        )
+                    }
+
+                    composable(OperasionalTab.LAPORAN.route) {
+                        val vm: LaporanViewModel = viewModel(
+                            key = "laporan_${authState.propertiAktif.id}",
+                            factory = LaporanViewModel.Factory(repository),
+                        )
+                        LaporanScreen(viewModel = vm)
+                    }
+
+                    composable(ROUTE_PENGATURAN) {
+                        val vm: PengaturanViewModel? = if (bolehKelolaPengaturan) {
+                            viewModel(
+                                key = "pengaturan_${authState.propertiAktif.id}",
+                                factory = PengaturanViewModel.Factory(repository),
+                            )
+                        } else {
+                            null
+                        }
+                        PengaturanScreen(
+                            viewModel = vm,
+                            user = authState.user,
+                            propertiAktif = authState.propertiAktif,
+                            bolehKelolaPengaturan = bolehKelolaPengaturan,
+                            canSwitchProperti = isGlobalRole,
+                            onSwitchProperti = onReleaseProperti,
+                            onLogout = { showLogoutConfirm = true },
+                        )
+                    }
+
+                    composable(ROUTE_LAUNDRY_NEW) {
+                        val vm: LaundryFormViewModel = viewModel(
+                            factory = LaundryFormViewModel.Factory(repository, editId = null),
+                        )
+                        LaundryFormScreen(
+                            viewModel = vm,
+                            onBack = { navController.popBackStack() },
+                            onSaved = {
+                                navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
+                                navController.popBackStack()
+                            },
+                            onOpenExistingEdit = { existingId ->
+                                navController.navigate("laundry/edit/$existingId") {
+                                    popUpTo(ROUTE_LAUNDRY_NEW) { inclusive = true }
+                                }
+                            },
+                        )
+                    }
+
+                    composable(
+                        route = ROUTE_LAUNDRY_EDIT,
+                        arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                    ) { entry ->
+                        val id = entry.arguments?.getInt("id") ?: return@composable
+                        val vm: LaundryFormViewModel = viewModel(
+                            key = "laundry_edit_$id",
+                            factory = LaundryFormViewModel.Factory(repository, editId = id),
+                        )
+                        LaundryFormScreen(
+                            viewModel = vm,
+                            onBack = { navController.popBackStack() },
+                            onSaved = {
+                                navController.previousBackStackEntry?.savedStateHandle?.set("refresh_data", true)
+                                navController.popBackStack()
+                            },
+                            onOpenExistingEdit = { existingId ->
+                                navController.navigate("laundry/edit/$existingId") {
+                                    popUpTo(ROUTE_LAUNDRY_EDIT) { inclusive = true }
+                                }
+                            },
+                        )
+                    }
+
+                    composable(
+                        route = ROUTE_PENGHUNI_DETAIL,
+                        arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                    ) { entry ->
+                        val id = entry.arguments?.getInt("id") ?: return@composable
+                        val vm: PenghuniDetailViewModel = viewModel(
+                            key = "penghuni_detail_$id",
+                            factory = PenghuniDetailViewModel.Factory(repository, penghuniId = id),
+                        )
+                        val needsRefresh by entry.savedStateHandle
+                            .getStateFlow("refresh_data", false)
+                            .collectAsStateWithLifecycle()
+                        LaunchedEffect(needsRefresh) {
+                            if (needsRefresh) {
+                                vm.load(isRefresh = true)
+                                notifikasiViewModel.refresh()
+                                entry.savedStateHandle["refresh_data"] = false
+                            }
+                        }
+                        PenghuniDetailScreen(
+                            viewModel = vm,
+                            onBack = { navController.popBackStack() },
+                            onEditLaundry = { laundryId -> navController.navigate("laundry/edit/$laundryId") },
+                        )
+                    }
                 }
             }
         }
     }
 
-    if (authState.showPropertiSwitcher) {
-        PropertiSwitcherDialog(
-            propertiList = authState.propertiList,
-            activeId = authState.propertiAktif.id,
-            isSwitching = authState.isSwitchingProperti,
-            onSelect = onSelectProperti,
-            onDismiss = onDismissPropertiSwitcher,
+    if (showNotifDialog) {
+        NotificationListDialog(
+            notifications = notifications,
+            onItemClick = { notif ->
+                showNotifDialog = false
+                notif.penghuniId?.let { id ->
+                    navController.navigate("penghuni/detail/$id")
+                }
+            },
+            onSeeAllPenghuni = {
+                showNotifDialog = false
+                navigateTopLevel(OperasionalTab.PENGHUNI.route)
+            },
+            onDismiss = { showNotifDialog = false },
+        )
+    }
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("Keluar dari Laundry-Kos?") },
+            text = { Text("Sesi login Anda akan diakhiri dan Anda perlu masuk kembali untuk mengakses aplikasi.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutConfirm = false
+                        onLogout()
+                    },
+                ) {
+                    Text("Ya, Keluar", color = ext.danger)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) { Text("Batal") }
+            },
         )
     }
 }
