@@ -58,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.laundry_kos.core.designsystem.EmptyStateCard
 import com.laundry_kos.core.designsystem.ErrorBannerCard
 import com.laundry_kos.core.designsystem.LaundryCard
@@ -74,17 +76,20 @@ import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
+import com.laundry_kos.core.notifikasi.NotificationStore
 import com.laundry_kos.data.dto.PropertiDto
 import com.laundry_kos.data.dto.SimpanPropertiRequestDto
 import com.laundry_kos.feature.notifikasi.AppNotification
 import com.laundry_kos.feature.notifikasi.NotificationBellButton
 import com.laundry_kos.feature.notifikasi.NotificationListDialog
 import com.laundry_kos.feature.notifikasi.NotificationType
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PropertiPickerScreen(
     uiState: SessionUiState.SelectProperti,
+    notificationStore: NotificationStore,
     onSelect: (Int) -> Unit,
     onRefresh: () -> Unit,
     onTambahProperti: (SimpanPropertiRequestDto, onCreated: (PropertiDto) -> Unit) -> Unit,
@@ -98,6 +103,8 @@ fun PropertiPickerScreen(
     val ext = LaundryKosTheme.extendedColors
     val isWide = rememberIsWideLayout()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val notifStoreState by notificationStore.state.collectAsStateWithLifecycle()
 
     var showTambahDialog by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<PropertiDto?>(null) }
@@ -112,19 +119,23 @@ fun PropertiPickerScreen(
     }
 
     // Notifikasi global persis AppLayout.php baris 76-97: properti draf / tanpa admin aktif
-    val globalNotifications = remember(uiState.propertiList) {
+    val globalNotifications = remember(uiState.propertiList, notifStoreState.readIds, notifStoreState.dismissedIds) {
         uiState.propertiList
             .filter { it.status != "aktif" || it.adminAktifNama.isNullOrBlank() }
             .map { prop ->
+                val id = "prop_${prop.id}"
                 AppNotification(
-                    id = "prop_${prop.id}",
+                    id = id,
                     type = NotificationType.INFO,
                     title = "Lengkapi setup ${prop.nama}",
                     subtitle = if (prop.status != "aktif") "Status saat ini: ${prop.status}." else "Admin aktif belum ditentukan.",
                     penghuniId = prop.id, // digunakan untuk buka setup properti
+                    isRead = id in notifStoreState.readIds,
                 )
             }
+            .filterNot { it.id in notifStoreState.dismissedIds }
     }
+    val globalUnreadCount = globalNotifications.count { !it.isRead }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -175,7 +186,7 @@ fun PropertiPickerScreen(
                         Text("Tambah", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                     }
                     NotificationBellButton(
-                        count = globalNotifications.size,
+                        count = globalUnreadCount,
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = { showNotifDialog = true },
                     )
@@ -325,8 +336,17 @@ fun PropertiPickerScreen(
             notifications = globalNotifications,
             emptyMessage = "Semua properti sudah aktif dan memiliki admin.",
             onItemClick = { notif ->
+                scope.launch { notificationStore.markAsRead(notif.id) }
                 showNotifDialog = false
                 notif.penghuniId?.let(onOpenSetup)
+            },
+            onMarkAllRead = {
+                val ids = globalNotifications.map { it.id }
+                scope.launch { notificationStore.markAllAsRead(ids) }
+            },
+            onClearAll = {
+                val ids = globalNotifications.map { it.id }
+                scope.launch { notificationStore.clearAll(propertiId = null, allVisibleIds = ids) }
             },
             onSeeAllPenghuni = null,
             onDismiss = { showNotifDialog = false },

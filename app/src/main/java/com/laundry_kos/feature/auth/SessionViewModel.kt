@@ -1,11 +1,16 @@
 package com.laundry_kos.feature.auth
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.laundry_kos.core.di.AppContainer
 import com.laundry_kos.core.network.ApiError
 import com.laundry_kos.core.network.ApiResult
 import com.laundry_kos.core.network.GlobalApiEvent
+import com.laundry_kos.core.notifikasi.ActivitySyncWorker
+import com.laundry_kos.core.notifikasi.NotificationStore
+import com.laundry_kos.core.notifikasi.SystemNotificationHelper
 import com.laundry_kos.data.dto.PermissionsDto
 import com.laundry_kos.data.dto.PropertiDto
 import com.laundry_kos.data.dto.SimpanPropertiRequestDto
@@ -48,6 +53,8 @@ sealed interface SessionUiState {
 
 class SessionViewModel(
     private val repository: LaundryKosRepository,
+    private val appContext: Context,
+    private val notificationStore: NotificationStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<SessionUiState>(SessionUiState.Checking)
@@ -56,6 +63,12 @@ class SessionViewModel(
     init {
         observeGlobalEvents()
         bootstrap()
+    }
+
+    private suspend fun cleanupSessionSideEffects() {
+        ActivitySyncWorker.cancel(appContext)
+        SystemNotificationHelper.cancelAll(appContext)
+        notificationStore.resetAll()
     }
 
     private fun isGlobalRole(user: UserDto): Boolean =
@@ -74,6 +87,7 @@ class SessionViewModel(
                 when (event) {
                     is GlobalApiEvent.SessionRevoked -> {
                         repository.sessionStore.clearSession()
+                        cleanupSessionSideEffects()
                         _state.value = SessionUiState.Unauthenticated(
                             bannerTitle = titleForBlockedCode(event.code),
                             bannerMessage = event.message,
@@ -82,6 +96,7 @@ class SessionViewModel(
                     }
                     is GlobalApiEvent.Unauthorized -> {
                         repository.sessionStore.clearSession()
+                        cleanupSessionSideEffects()
                         _state.value = SessionUiState.Unauthenticated(
                             bannerTitle = "Sesi Login Berakhir",
                             bannerMessage = event.message,
@@ -120,6 +135,7 @@ class SessionViewModel(
             when (val res = repository.fetchMe()) {
                 is ApiResult.Success -> {
                     val user = res.data.user
+                    ActivitySyncWorker.schedule(appContext)
                     // Sesuai workflow web (AuthenticatedSessionController & PastikanPropertiAktif):
                     // Owner / DevAdmin tanpa properti terpilih di sesi tetap mendarat di layar Pilih Gedung.
                     if (isGlobalRole(user) && saved.propertiId == null) {
@@ -140,6 +156,7 @@ class SessionViewModel(
                 is ApiResult.Failure -> {
                     if (res.error.isUnauthorized || res.error.isForbiddenBlocked) {
                         repository.sessionStore.clearSession()
+                        cleanupSessionSideEffects()
                     }
                     _state.value = SessionUiState.Unauthenticated(
                         bannerTitle = if (res.error.isAccountOrPropertyBlocked || res.error.isUnauthorized) {
@@ -161,6 +178,7 @@ class SessionViewModel(
             when (val res = repository.login(username, password)) {
                 is ApiResult.Success -> {
                     val user = res.data.user
+                    ActivitySyncWorker.schedule(appContext)
                     // Persis AuthenticatedSessionController::store di Laravel Web:
                     // Owner & DevAdmin SELALU diarahkan ke Pilih Gedung dahulu setelah login!
                     if (isGlobalRole(user)) {
@@ -333,6 +351,7 @@ class SessionViewModel(
     fun logout() {
         viewModelScope.launch {
             repository.logout()
+            cleanupSessionSideEffects()
             _state.value = SessionUiState.Unauthenticated(
                 bannerMessage = "Anda telah keluar dari akun.",
                 bannerIsError = false,
@@ -357,6 +376,7 @@ class SessionViewModel(
                 },
             )
         } else {
+            ActivitySyncWorker.schedule(appContext)
             _state.value = SessionUiState.Authenticated(
                 user = user,
                 propertiAktif = propertiAktif,
@@ -366,9 +386,13 @@ class SessionViewModel(
         }
     }
 
-    class Factory(private val repository: LaundryKosRepository) : ViewModelProvider.Factory {
+    class Factory(private val container: AppContainer) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            SessionViewModel(repository) as T
+            SessionViewModel(
+                repository = container.repository,
+                appContext = container.appContext,
+                notificationStore = container.notificationStore,
+            ) as T
     }
 }

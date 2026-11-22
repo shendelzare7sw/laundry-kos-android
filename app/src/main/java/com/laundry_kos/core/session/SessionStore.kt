@@ -23,6 +23,7 @@ private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataS
 data class StoredSession(
     val token: String? = null,
     val propertiId: Int? = null,
+    val userId: Int? = null,
     val loaded: Boolean = false,
 )
 
@@ -39,12 +40,16 @@ class SessionStore(context: Context) {
     val currentPropertiId: Int?
         get() = _state.value.propertiId
 
+    val currentUserId: Int?
+        get() = _state.value.userId
+
     init {
         scope.launch {
             dataStore.data.collect { prefs ->
                 _state.value = StoredSession(
                     token = prefs[KEY_TOKEN]?.takeIf { it.isNotBlank() },
                     propertiId = prefs[KEY_PROPERTI_ID],
+                    userId = prefs[KEY_USER_ID],
                     loaded = true,
                 )
             }
@@ -57,19 +62,33 @@ class SessionStore(context: Context) {
         val loaded = StoredSession(
             token = prefs[KEY_TOKEN]?.takeIf { it.isNotBlank() },
             propertiId = prefs[KEY_PROPERTI_ID],
+            userId = prefs[KEY_USER_ID],
             loaded = true,
         )
         _state.value = loaded
         return loaded
     }
 
-    suspend fun saveSession(token: String, propertiId: Int?) {
+    suspend fun saveSession(token: String, propertiId: Int?, userId: Int? = null) {
         dataStore.edit { prefs ->
             prefs[KEY_TOKEN] = token
             if (propertiId != null) {
                 prefs[KEY_PROPERTI_ID] = propertiId
             } else {
                 prefs.remove(KEY_PROPERTI_ID)
+            }
+            if (userId != null) {
+                prefs[KEY_USER_ID] = userId
+            }
+        }
+    }
+
+    suspend fun saveUserId(userId: Int?) {
+        dataStore.edit { prefs ->
+            if (userId != null) {
+                prefs[KEY_USER_ID] = userId
+            } else {
+                prefs.remove(KEY_USER_ID)
             }
         }
     }
@@ -88,11 +107,13 @@ class SessionStore(context: Context) {
         dataStore.edit { prefs ->
             prefs.remove(KEY_TOKEN)
             prefs.remove(KEY_PROPERTI_ID)
+            prefs.remove(KEY_USER_ID)
         }
     }
 
     companion object {
         private val KEY_TOKEN = stringPreferencesKey("sanctum_token")
         private val KEY_PROPERTI_ID = intPreferencesKey("active_properti_id")
+        private val KEY_USER_ID = intPreferencesKey("current_user_id")
     }
 }

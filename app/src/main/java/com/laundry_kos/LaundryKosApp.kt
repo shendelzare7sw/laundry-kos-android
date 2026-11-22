@@ -2,6 +2,7 @@ package com.laundry_kos
 
 import android.app.Application
 import com.laundry_kos.core.di.AppContainer
+import com.laundry_kos.core.notifikasi.SystemNotificationHelper
 
 class LaundryKosApp : Application() {
     lateinit var container: AppContainer
@@ -10,5 +11,6 @@ class LaundryKosApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        SystemNotificationHelper.ensureChannel(this)
     }
 }

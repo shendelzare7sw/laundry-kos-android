@@ -83,6 +83,7 @@ import androidx.navigation.navArgument
 import com.laundry_kos.R
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
+import com.laundry_kos.core.di.AppContainer
 import com.laundry_kos.data.repository.LaundryKosRepository
 import com.laundry_kos.feature.auth.LoginScreen
 import com.laundry_kos.feature.auth.PropertiPickerScreen
@@ -130,9 +131,9 @@ private const val ROUTE_PENGHUNI_DETAIL = "penghuni/detail/{id}"
 
 @Composable
 fun LaundryKosRoot(
-    repository: LaundryKosRepository,
+    container: AppContainer,
 ) {
-    val sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.Factory(repository))
+    val sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.Factory(container))
     val sessionState by sessionViewModel.state.collectAsStateWithLifecycle()
 
     when (val state = sessionState) {
@@ -150,7 +151,7 @@ fun LaundryKosRoot(
         is SessionUiState.SelectProperti -> {
             OwnerGedungNavHost(
                 uiState = state,
-                repository = repository,
+                container = container,
                 sessionViewModel = sessionViewModel,
             )
         }
@@ -158,7 +159,7 @@ fun LaundryKosRoot(
             key(state.propertiAktif.id) {
                 AuthenticatedAppShell(
                     authState = state,
-                    repository = repository,
+                    container = container,
                     onReleaseProperti = sessionViewModel::releaseProperti,
                     onLogout = sessionViewModel::logout,
                 )
@@ -176,14 +177,16 @@ fun LaundryKosRoot(
 @Composable
 private fun OwnerGedungNavHost(
     uiState: SessionUiState.SelectProperti,
-    repository: LaundryKosRepository,
+    container: AppContainer,
     sessionViewModel: SessionViewModel,
 ) {
+    val repository = container.repository
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = "gedung/list") {
         composable("gedung/list") {
             PropertiPickerScreen(
                 uiState = uiState,
+                notificationStore = container.notificationStore,
                 onSelect = sessionViewModel::selectProperti,
                 onRefresh = sessionViewModel::refreshPropertiList,
                 onTambahProperti = sessionViewModel::tambahProperti,
@@ -235,10 +238,11 @@ private fun OwnerGedungNavHost(
 @Composable
 private fun AuthenticatedAppShell(
     authState: SessionUiState.Authenticated,
-    repository: LaundryKosRepository,
+    container: AppContainer,
     onReleaseProperti: () -> Unit,
     onLogout: () -> Unit,
 ) {
+    val repository = container.repository
     val navController = rememberNavController()
     val navBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStack?.destination?.route
@@ -259,11 +263,16 @@ private fun AuthenticatedAppShell(
         key = "notifikasi_${authState.propertiAktif.id}",
         factory = NotifikasiViewModel.Factory(
             repository = repository,
+            appContext = container.appContext,
+            notificationStore = container.notificationStore,
+            activitySyncEngine = container.activitySyncEngine,
             propertiAktif = authState.propertiAktif,
+            currentUserId = authState.user.id,
             isGlobalRole = isGlobalRole,
         ),
     )
     val notifications by notifikasiViewModel.notifications.collectAsStateWithLifecycle()
+    val unreadCount by notifikasiViewModel.unreadCount.collectAsStateWithLifecycle()
 
     fun navigateTopLevel(route: String) {
         navController.navigate(route) {
@@ -555,10 +564,10 @@ private fun AuthenticatedAppShell(
                         },
                         actions = {
                             NotificationBellButton(
-                                count = notifications.size,
+                                count = unreadCount,
                                 tint = Color.White,
                                 onClick = {
-                                    notifikasiViewModel.refresh()
+                                    notifikasiViewModel.refresh(emitSystem = false)
                                     showNotifDialog = true
                                 },
                             )
@@ -862,11 +871,15 @@ private fun AuthenticatedAppShell(
         NotificationListDialog(
             notifications = notifications,
             onItemClick = { notif ->
+                notifikasiViewModel.markAsRead(notif.id)
                 showNotifDialog = false
-                notif.penghuniId?.let { id ->
-                    navController.navigate("penghuni/detail/$id")
+                when {
+                    notif.penghuniId != null -> navController.navigate("penghuni/detail/${notif.penghuniId}")
+                    notif.laundryId != null -> navigateTopLevel(OperasionalTab.LAUNDRY.route)
                 }
             },
+            onMarkAllRead = notifikasiViewModel::markAllAsRead,
+            onClearAll = notifikasiViewModel::clearAll,
             onSeeAllPenghuni = {
                 showNotifDialog = false
                 navigateTopLevel(OperasionalTab.PENGHUNI.route)

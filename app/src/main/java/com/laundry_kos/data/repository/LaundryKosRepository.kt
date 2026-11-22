@@ -29,6 +29,7 @@ class LaundryKosRepository(
             sessionStore.saveSession(
                 token = result.data.token,
                 propertiId = result.data.propertiAktif?.id,
+                userId = result.data.user.id,
             )
         }
         return result
@@ -38,13 +39,18 @@ class LaundryKosRepository(
         val result = safeApiCall(eventBus) { api.me() }
         if (result is ApiResult.Success) {
             sessionStore.savePropertiId(result.data.propertiAktif?.id)
+            sessionStore.saveUserId(result.data.user.id)
         }
         return result
     }
 
     suspend fun selectProperti(propertiId: Int): ApiResult<MeResponseDto> {
         sessionStore.savePropertiId(propertiId)
-        return safeApiCall(eventBus) { api.me() }
+        val result = safeApiCall(eventBus) { api.me() }
+        if (result is ApiResult.Success) {
+            sessionStore.saveUserId(result.data.user.id)
+        }
+        return result
     }
 
     suspend fun logout() {

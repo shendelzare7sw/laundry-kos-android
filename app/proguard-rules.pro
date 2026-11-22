@@ -12,6 +12,11 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 -keep,includedescriptorclasses class com.laundry_kos.core.network.ApiErrorPayload** { *; }
+-keep,includedescriptorclasses class com.laundry_kos.core.notifikasi.**$$serializer { *; }
+-keepclassmembers class com.laundry_kos.core.notifikasi.** {
+    *** Companion;
+}
+-keep class com.laundry_kos.core.notifikasi.ActivitySyncWorker { *; }
 
 # Retrofit: pertahankan interface API dan signature suspend/generic
 -keep,allowobfuscation,allowshrinking interface com.laundry_kos.data.api.LaundryKosApi { *; }
