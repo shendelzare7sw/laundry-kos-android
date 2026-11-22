@@ -75,7 +75,7 @@ object NetworkModule {
 
         if (BuildConfig.DEBUG) {
             val logging = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = HttpLoggingInterceptor.Level.BASIC
                 redactHeader("Authorization")
             }
             clientBuilder.addInterceptor(logging)

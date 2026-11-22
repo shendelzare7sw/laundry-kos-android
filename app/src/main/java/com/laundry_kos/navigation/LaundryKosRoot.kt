@@ -2,6 +2,8 @@ package com.laundry_kos.navigation
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -200,7 +202,14 @@ private fun OwnerGedungNavHost(
 ) {
     val repository = container.repository
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "gedung/list") {
+    NavHost(
+        navController = navController,
+        startDestination = "gedung/list",
+        enterTransition = { fadeIn(animationSpec = tween(150)) },
+        exitTransition = { fadeOut(animationSpec = tween(110)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+        popExitTransition = { fadeOut(animationSpec = tween(110)) },
+    ) {
         composable("gedung/list") {
             PropertiPickerScreen(
                 uiState = uiState,
@@ -289,16 +298,22 @@ private fun AuthenticatedAppShell(
             isGlobalRole = isGlobalRole,
         ),
     )
-    val notifications by notifikasiViewModel.notifications.collectAsStateWithLifecycle()
-    val unreadCount by notifikasiViewModel.unreadCount.collectAsStateWithLifecycle()
 
     fun navigateTopLevel(route: String) {
+        if (currentRoute == route) return
         navController.navigate(route) {
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
             }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    fun closeDrawerThen(action: () -> Unit) {
+        scope.launch {
+            drawerState.close()
+            action()
         }
     }
 
@@ -383,10 +398,7 @@ private fun AuthenticatedAppShell(
                             val selected = currentRoute == tab.route
                             NavigationDrawerItem(
                                 selected = selected,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    navigateTopLevel(tab.route)
-                                },
+                                onClick = { closeDrawerThen { navigateTopLevel(tab.route) } },
                                 icon = {
                                     Icon(
                                         tab.icon,
@@ -425,10 +437,7 @@ private fun AuthenticatedAppShell(
                         if (isGlobalRole) {
                             NavigationDrawerItem(
                                 selected = false,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    onReleaseProperti()
-                                },
+                                onClick = { closeDrawerThen(onReleaseProperti) },
                                 icon = {
                                     Icon(Icons.Default.Apartment, contentDescription = null, tint = ext.goldSoft)
                                 },
@@ -449,10 +458,7 @@ private fun AuthenticatedAppShell(
                         if (bolehKelolaPengguna) {
                             NavigationDrawerItem(
                                 selected = currentRoute == ROUTE_PENGGUNA,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    navController.navigate(ROUTE_PENGGUNA)
-                                },
+                                onClick = { closeDrawerThen { navController.navigate(ROUTE_PENGGUNA) } },
                                 icon = {
                                     Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = Color.White.copy(alpha = 0.85f))
                                 },
@@ -475,10 +481,7 @@ private fun AuthenticatedAppShell(
                         val settingSelected = currentRoute == ROUTE_PENGATURAN
                         NavigationDrawerItem(
                             selected = settingSelected,
-                            onClick = {
-                                scope.launch { drawerState.close() }
-                                navigateTopLevel(ROUTE_PENGATURAN)
-                            },
+                            onClick = { closeDrawerThen { navigateTopLevel(ROUTE_PENGATURAN) } },
                             icon = {
                                 Icon(
                                     imageVector = if (bolehKelolaPengaturan) Icons.Default.Settings else Icons.Default.Person,
@@ -589,6 +592,7 @@ private fun AuthenticatedAppShell(
                             }
                         },
                         actions = {
+                            val unreadCount by notifikasiViewModel.unreadCount.collectAsStateWithLifecycle()
                             NotificationBellButton(
                                 count = unreadCount,
                                 tint = Color.White,
@@ -705,6 +709,10 @@ private fun AuthenticatedAppShell(
                 NavHost(
                     navController = navController,
                     startDestination = OperasionalTab.BERANDA.route,
+                    enterTransition = { fadeIn(animationSpec = tween(150)) },
+                    exitTransition = { fadeOut(animationSpec = tween(110)) },
+                    popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+                    popExitTransition = { fadeOut(animationSpec = tween(110)) },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
@@ -894,6 +902,7 @@ private fun AuthenticatedAppShell(
     }
 
     if (showNotifDialog) {
+        val notifications by notifikasiViewModel.notifications.collectAsStateWithLifecycle()
         NotificationListDialog(
             notifications = notifications,
             onItemClick = { notif ->

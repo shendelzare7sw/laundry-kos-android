@@ -137,8 +137,10 @@ class NotifikasiViewModel(
         )
 
     init {
-        refresh(emitSystem = true)
         viewModelScope.launch {
+            // Beri jeda singkat agar render & load awal Beranda tidak berebut bandwidth/CPU
+            delay(INITIAL_SYNC_DELAY_MS)
+            refresh(emitSystem = true)
             while (isActive) {
                 delay(POLL_INTERVAL_MS)
                 refresh(emitSystem = true)
@@ -151,14 +153,14 @@ class NotifikasiViewModel(
         viewModelScope.launch {
             isSyncing = true
             try {
-                // 1. Deteksi perubahan data lintas role & kirim notifikasi sistem Android
-                activitySyncEngine.syncActiveProperty(
+                // 1. Deteksi perubahan data lintas role & kirim notifikasi sistem Android (paralel di IO)
+                val outcome = activitySyncEngine.syncActiveProperty(
                     propertiId = propertiAktif.id,
                     currentUserId = currentUserId,
                     emitSystemNotifications = emitSystem,
                 )
 
-                // 2. Bangun peringatan aktif (setup & kuota penghuni)
+                // 2. Bangun peringatan aktif (setup & kuota penghuni) — pakai ulang data beranda tanpa double-fetch
                 val items = mutableListOf<AppNotification>()
                 if (isGlobalRole && propertiAktif.status != "aktif") {
                     items.add(
@@ -171,32 +173,30 @@ class NotifikasiViewModel(
                         ),
                     )
                 }
-                when (val res = repository.fetchBeranda(null)) {
-                    is ApiResult.Success -> {
-                        res.data.daftarPeringatan.forEach { p ->
-                            val isLewat = p.kuota.status == "lewat"
-                            items.add(
-                                AppNotification(
-                                    id = "kuota_${propertiAktif.id}_${p.penghuniId}_${p.kuota.status}",
-                                    type = if (isLewat) NotificationType.DANGER else NotificationType.WARN,
-                                    title = if (isLewat) {
-                                        "${p.nama} (Kamar ${p.kamarNomor}) melewati kuota"
-                                    } else {
-                                        "${p.nama} (Kamar ${p.kamarNomor}) mendekati kuota"
-                                    },
-                                    subtitle = if (isLewat) {
-                                        "Pemakaian ${p.kuota.terpakaiKg}/${p.kuota.kuotaKg} kg · Tagihan ${Formatters.formatRupiah(p.kuota.tagihanLewatKuota)}"
-                                    } else {
-                                        "Pemakaian ${p.kuota.terpakaiKg}/${p.kuota.kuotaKg} kg · Sisa ${p.kuota.sisaKg} kg"
-                                    },
-                                    penghuniId = p.penghuniId,
-                                ),
-                            )
-                        }
-                    }
-                    is ApiResult.Failure -> Unit
+                val berandaData = outcome.beranda ?: (repository.fetchBeranda(null) as? ApiResult.Success)?.data
+                berandaData?.daftarPeringatan?.forEach { p ->
+                    val isLewat = p.kuota.status == "lewat"
+                    items.add(
+                        AppNotification(
+                            id = "kuota_${propertiAktif.id}_${p.penghuniId}_${p.kuota.status}",
+                            type = if (isLewat) NotificationType.DANGER else NotificationType.WARN,
+                            title = if (isLewat) {
+                                "${p.nama} (Kamar ${p.kamarNomor}) melewati kuota"
+                            } else {
+                                "${p.nama} (Kamar ${p.kamarNomor}) mendekati kuota"
+                            },
+                            subtitle = if (isLewat) {
+                                "Pemakaian ${p.kuota.terpakaiKg}/${p.kuota.kuotaKg} kg · Tagihan ${Formatters.formatRupiah(p.kuota.tagihanLewatKuota)}"
+                            } else {
+                                "Pemakaian ${p.kuota.terpakaiKg}/${p.kuota.kuotaKg} kg · Sisa ${p.kuota.sisaKg} kg"
+                            },
+                            penghuniId = p.penghuniId,
+                        ),
+                    )
                 }
-                _liveAlerts.value = items
+                if (_liveAlerts.value != items) {
+                    _liveAlerts.value = items
+                }
             } finally {
                 isSyncing = false
             }
@@ -248,7 +248,8 @@ class NotifikasiViewModel(
     }
 
     private companion object {
-        const val POLL_INTERVAL_MS = 30_000L
+        const val INITIAL_SYNC_DELAY_MS = 2_500L
+        const val POLL_INTERVAL_MS = 60_000L
     }
 }
 

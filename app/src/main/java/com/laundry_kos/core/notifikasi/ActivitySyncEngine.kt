@@ -4,10 +4,20 @@ import android.content.Context
 import com.laundry_kos.core.network.ApiResult
 import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
+import com.laundry_kos.data.dto.BerandaResponseDto
 import com.laundry_kos.data.dto.LaundryDto
 import com.laundry_kos.data.dto.PenghuniDto
 import com.laundry_kos.data.repository.LaundryKosRepository
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+
+data class ActivitySyncOutcome(
+    val newEvents: List<StoredNotification>,
+    val beranda: BerandaResponseDto? = null,
+)
 
 class ActivitySyncEngine(
     private val context: Context,
@@ -23,16 +33,20 @@ class ActivitySyncEngine(
         propertiId: Int,
         currentUserId: Int?,
         emitSystemNotifications: Boolean = true,
-    ): List<StoredNotification> {
+    ): ActivitySyncOutcome = withContext(Dispatchers.IO) {
         val storeState = notificationStore.current()
         val prev = storeState.snapshots[propertiId] ?: PropertyActivitySnapshot()
 
-        val laundryRes = repository.fetchLaundryList(periode = "7_hari", tampil = 40)
-        val penghuniRes = repository.fetchPenghuniList(tab = "semua")
-        val berandaRes = repository.fetchBeranda(null)
+        val (laundryRes, penghuniRes, berandaRes) = coroutineScope {
+            val laundryDeferred = async { repository.fetchLaundryList(periode = "7_hari", tampil = 40) }
+            val penghuniDeferred = async { repository.fetchPenghuniList(tab = "semua") }
+            val berandaDeferred = async { repository.fetchBeranda(null) }
+            Triple(laundryDeferred.await(), penghuniDeferred.await(), berandaDeferred.await())
+        }
 
+        val berandaData = (berandaRes as? ApiResult.Success)?.data
         if (laundryRes !is ApiResult.Success && penghuniRes !is ApiResult.Success && berandaRes !is ApiResult.Success) {
-            return emptyList()
+            return@withContext ActivitySyncOutcome(emptyList(), null)
         }
 
         val nowMs = System.currentTimeMillis()
@@ -225,7 +239,10 @@ class ActivitySyncEngine(
             SystemNotificationHelper.showBatch(context, newEvents)
         }
 
-        return newEvents
+        ActivitySyncOutcome(
+            newEvents = newEvents,
+            beranda = berandaData,
+        )
     }
 
     private fun labelForLaundry(item: LaundryDto): String = when (item.jenis) {

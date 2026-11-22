@@ -97,7 +97,14 @@ class NotificationStore(private val context: Context) {
         newSnapshot: PropertyActivitySnapshot,
         newEvents: List<StoredNotification>,
     ) {
+        val existing = _state.value
+        if (newEvents.isEmpty() && existing.snapshots[propertiId] == newSnapshot) {
+            return
+        }
         updateState { cur ->
+            if (newEvents.isEmpty() && cur.snapshots[propertiId] == newSnapshot) {
+                return@updateState cur
+            }
             val mergedHistory = (newEvents + cur.history)
                 .distinctBy { it.id }
                 .sortedByDescending { it.timestampMs }
@@ -148,6 +155,7 @@ class NotificationStore(private val context: Context) {
         dataStore.edit { prefs ->
             val current = decode(prefs[KEY_PAYLOAD])
             val updated = transform(current)
+            if (updated == current) return@edit
             prefs[KEY_PAYLOAD] = json.encodeToString(updated)
             _state.value = updated
         }
