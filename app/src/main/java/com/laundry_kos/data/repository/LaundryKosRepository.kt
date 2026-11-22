@@ -13,6 +13,18 @@ class LaundryKosRepository(
     val sessionStore: SessionStore,
     val eventBus: ApiEventBus,
 ) {
+    @Volatile
+    private var lastLocalMutationAtMs: Long = 0L
+
+    fun wasRecentLocalMutation(windowMs: Long = 10_000L): Boolean =
+        (System.currentTimeMillis() - lastLocalMutationAtMs) in 0L..windowMs
+
+    private fun <T> trackMutation(result: ApiResult<T>): ApiResult<T> {
+        if (result is ApiResult.Success) {
+            lastLocalMutationAtMs = System.currentTimeMillis()
+        }
+        return result
+    }
     // --- Auth & Session ---
     suspend fun login(username: String, password: String): ApiResult<AuthResponseDto> {
         val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim().ifBlank { "Android" }
@@ -94,9 +106,12 @@ class LaundryKosRepository(
     suspend fun fetchKamar(hanyaKosong: Boolean = false): ApiResult<KamarListResponseDto> =
         safeApiCall(eventBus) { api.kamar(kosong = if (hanyaKosong) 1 else null) }
 
-    // --- Beranda ---
+    // --- Beranda & Notifikasi ---
     suspend fun fetchBeranda(bulan: String? = null): ApiResult<BerandaResponseDto> =
         safeApiCall(eventBus) { api.beranda(bulan = bulan) }
+
+    suspend fun fetchNotifikasi(): ApiResult<ServerNotifikasiResponseDto> =
+        safeApiCall(eventBus) { api.notifikasi() }
 
     // --- Laundry ---
     suspend fun fetchLaundryList(
@@ -135,25 +150,25 @@ class LaundryKosRepository(
         safeApiCall(eventBus) { api.detailLaundry(id) }
 
     suspend fun tambahLaundry(request: SimpanLaundryRequestDto): ApiResult<LaundryMutasiResponseDto> =
-        safeApiCall(eventBus) { api.tambahLaundry(request) }
+        trackMutation(safeApiCall(eventBus) { api.tambahLaundry(request) })
 
     suspend fun ubahLaundry(id: Int, request: SimpanLaundryRequestDto): ApiResult<LaundryMutasiResponseDto> =
-        safeApiCall(eventBus) { api.ubahLaundry(id, request) }
+        trackMutation(safeApiCall(eventBus) { api.ubahLaundry(id, request) })
 
     suspend fun hapusLaundry(id: Int): ApiResult<HapusLaundryResponseDto> =
-        safeApiCall(eventBus) { api.hapusLaundry(id) }
+        trackMutation(safeApiCall(eventBus) { api.hapusLaundry(id) })
 
     suspend fun fetchLaundryTerhapus(tampil: Int = 15): ApiResult<TerhapusListResponseDto> =
         safeApiCall(eventBus) { api.laundryTerhapus(tampil = tampil) }
 
     suspend fun pulihkanLaundry(id: Int): ApiResult<LaundryMutasiResponseDto> =
-        safeApiCall(eventBus) { api.pulihkanLaundry(id) }
+        trackMutation(safeApiCall(eventBus) { api.pulihkanLaundry(id) })
 
     suspend fun tetapkanPemilik(id: Int, penghuniId: Int): ApiResult<LaundryMutasiResponseDto> =
-        safeApiCall(eventBus) { api.tetapkanPemilik(id, TetapkanPemilikRequestDto(penghuniId)) }
+        trackMutation(safeApiCall(eventBus) { api.tetapkanPemilik(id, TetapkanPemilikRequestDto(penghuniId)) })
 
     suspend fun lengkapiHarga(): ApiResult<LengkapiHargaResponseDto> =
-        safeApiCall(eventBus) { api.lengkapiHarga() }
+        trackMutation(safeApiCall(eventBus) { api.lengkapiHarga() })
 
     // --- Penghuni ---
     suspend fun fetchPenghuniList(
@@ -172,31 +187,31 @@ class LaundryKosRepository(
         safeApiCall(eventBus) { api.detailPenghuni(id, bulan) }
 
     suspend fun tambahPenghuni(request: MasukPenghuniRequestDto): ApiResult<PenghuniMutasiResponseDto> =
-        safeApiCall(eventBus) { api.tambahPenghuni(request) }
+        trackMutation(safeApiCall(eventBus) { api.tambahPenghuni(request) })
 
     suspend fun ubahPenghuni(id: Int, request: UbahPenghuniRequestDto): ApiResult<PenghuniMutasiResponseDto> =
-        safeApiCall(eventBus) { api.ubahPenghuni(id, request) }
+        trackMutation(safeApiCall(eventBus) { api.ubahPenghuni(id, request) })
 
     suspend fun pindahKamar(id: Int, request: PindahKamarRequestDto): ApiResult<PenempatanMutasiResponseDto> =
-        safeApiCall(eventBus) { api.pindahKamar(id, request) }
+        trackMutation(safeApiCall(eventBus) { api.pindahKamar(id, request) })
 
     suspend fun batalkanPindah(id: Int): ApiResult<PenempatanMutasiResponseDto> =
-        safeApiCall(eventBus) { api.batalkanPindah(id) }
+        trackMutation(safeApiCall(eventBus) { api.batalkanPindah(id) })
 
     suspend fun keluarPenghuni(id: Int, request: KeluarPenghuniRequestDto): ApiResult<PenghuniMutasiResponseDto> =
-        safeApiCall(eventBus) { api.keluarPenghuni(id, request) }
+        trackMutation(safeApiCall(eventBus) { api.keluarPenghuni(id, request) })
 
     suspend fun batalkanKeluar(id: Int): ApiResult<PenghuniMutasiResponseDto> =
-        safeApiCall(eventBus) { api.batalkanKeluar(id) }
+        trackMutation(safeApiCall(eventBus) { api.batalkanKeluar(id) })
 
     suspend fun gantiNomor(id: Int, noWa: String?): ApiResult<PenghuniMutasiResponseDto> =
-        safeApiCall(eventBus) { api.gantiNomor(id, GantiNomorRequestDto(noWa?.takeIf { it.isNotBlank() })) }
+        trackMutation(safeApiCall(eventBus) { api.gantiNomor(id, GantiNomorRequestDto(noWa?.takeIf { it.isNotBlank() })) })
 
     suspend fun simpanPenyesuaianKuota(
         penghuniId: Int,
         request: PenyesuaianKuotaRequestDto,
     ): ApiResult<PenyesuaianKuotaResponseDto> =
-        safeApiCall(eventBus) { api.simpanPenyesuaianKuota(penghuniId, request) }
+        trackMutation(safeApiCall(eventBus) { api.simpanPenyesuaianKuota(penghuniId, request) })
 
     // --- Laporan & WA ---
     suspend fun fetchLaporan(

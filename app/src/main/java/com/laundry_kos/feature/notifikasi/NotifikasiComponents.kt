@@ -138,7 +138,7 @@ class NotifikasiViewModel(
 
     init {
         viewModelScope.launch {
-            // Beri jeda singkat agar render & load awal Beranda tidak berebut bandwidth/CPU
+            // Jeda singkat saja agar frame pertama Beranda mulus lalu langsung sinkron
             delay(INITIAL_SYNC_DELAY_MS)
             refresh(emitSystem = true)
             while (isActive) {
@@ -153,14 +153,40 @@ class NotifikasiViewModel(
         viewModelScope.launch {
             isSyncing = true
             try {
-                // 1. Deteksi perubahan data lintas role & kirim notifikasi sistem Android (paralel di IO)
+                // 1. Deteksi perubahan data lintas role & perangkat (Web <-> Mobile)
                 val outcome = activitySyncEngine.syncActiveProperty(
                     propertiId = propertiAktif.id,
                     currentUserId = currentUserId,
                     emitSystemNotifications = emitSystem,
                 )
 
-                // 2. Bangun peringatan aktif (setup & kuota penghuni) — pakai ulang data beranda tanpa double-fetch
+                // 2. Jika endpoint server terpadu tersedia, pakai langsung seluruh item terpadu (aktivitas + kuota + setup)
+                val serverFeed = outcome.serverItems
+                if (serverFeed != null) {
+                    val mapped = serverFeed.map { dto ->
+                        val parsedType = when (dto.tipe.lowercase()) {
+                            "activity" -> NotificationType.ACTIVITY
+                            "danger" -> NotificationType.DANGER
+                            "warn" -> NotificationType.WARN
+                            else -> NotificationType.INFO
+                        }
+                        AppNotification(
+                            id = dto.id,
+                            type = parsedType,
+                            title = dto.judul,
+                            subtitle = dto.keterangan,
+                            penghuniId = dto.penghuniId,
+                            laundryId = dto.laundryId,
+                            timestampLabel = dto.waktuLabel,
+                        )
+                    }
+                    if (_liveAlerts.value != mapped) {
+                        _liveAlerts.value = mapped
+                    }
+                    return@launch
+                }
+
+                // 3. Fallback jika server belum di-update: bangun peringatan aktif (setup & kuota penghuni)
                 val items = mutableListOf<AppNotification>()
                 if (isGlobalRole && propertiAktif.status != "aktif") {
                     items.add(
@@ -248,8 +274,8 @@ class NotifikasiViewModel(
     }
 
     private companion object {
-        const val INITIAL_SYNC_DELAY_MS = 2_500L
-        const val POLL_INTERVAL_MS = 60_000L
+        const val INITIAL_SYNC_DELAY_MS = 400L
+        const val POLL_INTERVAL_MS = 20_000L
     }
 }
 

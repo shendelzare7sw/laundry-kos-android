@@ -52,6 +52,8 @@ data class PenghuniSnapshotItem(
 @Serializable
 data class PropertyActivitySnapshot(
     val initialized: Boolean = false,
+    val serverFeedInitialized: Boolean = false,
+    val seenServerIds: Set<String> = emptySet(),
     val laundry: Map<Int, LaundrySnapshotItem> = emptyMap(),
     val penghuni: Map<Int, PenghuniSnapshotItem> = emptyMap(),
     val quotaStatus: Map<Int, String> = emptyMap(),

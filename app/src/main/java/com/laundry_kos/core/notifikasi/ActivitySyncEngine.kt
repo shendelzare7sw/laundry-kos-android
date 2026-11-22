@@ -7,6 +7,7 @@ import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.data.dto.BerandaResponseDto
 import com.laundry_kos.data.dto.LaundryDto
 import com.laundry_kos.data.dto.PenghuniDto
+import com.laundry_kos.data.dto.ServerNotifikasiItemDto
 import com.laundry_kos.data.repository.LaundryKosRepository
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +17,7 @@ import kotlinx.coroutines.withContext
 
 data class ActivitySyncOutcome(
     val newEvents: List<StoredNotification>,
+    val serverItems: List<ServerNotifikasiItemDto>? = null,
     val beranda: BerandaResponseDto? = null,
 )
 
@@ -26,8 +28,10 @@ class ActivitySyncEngine(
 ) {
     /**
      * Membandingkan data terbaru dari server dengan snapshot lokal terakhir untuk mendeteksi
-     * perubahan antar role (input/ubah/hapus laundry, perubahan penghuni, dan peringatan kuota)
-     * lalu menampilkan notifikasi ke panel sistem Android.
+     * perubahan lintas role & perangkat (Web <-> Mobile), lalu menampilkan notifikasi ke panel sistem Android.
+     *
+     * Jalur utama memakai endpoint terpadu `GET /api/v1/notifikasi` (ringan & 100% sinkron dengan Web).
+     * Jika server belum mendukung endpoint baru (mis. 404 sebelum VPS pull), otomatis fallback ke diff 3 endpoint.
      */
     suspend fun syncActiveProperty(
         propertiId: Int,
@@ -37,6 +41,75 @@ class ActivitySyncEngine(
         val storeState = notificationStore.current()
         val prev = storeState.snapshots[propertiId] ?: PropertyActivitySnapshot()
 
+        // Jalur utama: endpoint server terpadu /api/v1/notifikasi
+        val serverFeedRes = repository.fetchNotifikasi()
+        if (serverFeedRes is ApiResult.Success) {
+            val items = serverFeedRes.data.items
+            val nowMs = System.currentTimeMillis()
+            val currentIds = items.map { it.id }.toSet()
+
+            val newItems = if (prev.serverFeedInitialized) {
+                items.filter { it.id !in prev.seenServerIds }
+            } else {
+                emptyList()
+            }
+
+            // Simpan semua aktivitas terbaru dari server ke riwayat lokal (termasuk seed awal tanpa spam popup)
+            val newStored = newItems.map { dto ->
+                StoredNotification(
+                    id = dto.id,
+                    propertiId = propertiId,
+                    type = dto.tipe.uppercase(),
+                    title = dto.judul,
+                    subtitle = dto.keterangan,
+                    timestampMs = dto.timestampMs ?: nowMs,
+                    penghuniId = dto.penghuniId,
+                    laundryId = dto.laundryId,
+                )
+            }
+
+            val updatedSnapshot = prev.copy(
+                serverFeedInitialized = true,
+                seenServerIds = (prev.seenServerIds + currentIds).takeLastCompat(150),
+            )
+
+            notificationStore.recordSyncResult(
+                propertiId = propertiId,
+                newSnapshot = updatedSnapshot,
+                newEvents = newStored,
+            )
+
+            // Tampilkan di panel Android untuk semua perubahan dari Web / HP lain
+            // (hanya lewati jika aktor == akun ini DAN baru saja melakukan simpan di HP ini < 10 detik lalu)
+            if (emitSystemNotifications && newItems.isNotEmpty()) {
+                val isRecentOwnWrite = repository.wasRecentLocalMutation(windowMs = 10_000L)
+                val toNotify = newItems.filterNot { dto ->
+                    isRecentOwnWrite && currentUserId != null && dto.aktorId == currentUserId
+                }.map { dto ->
+                    StoredNotification(
+                        id = dto.id,
+                        propertiId = propertiId,
+                        type = dto.tipe.uppercase(),
+                        title = dto.judul,
+                        subtitle = dto.keterangan,
+                        timestampMs = dto.timestampMs ?: nowMs,
+                        penghuniId = dto.penghuniId,
+                        laundryId = dto.laundryId,
+                    )
+                }
+                if (toNotify.isNotEmpty()) {
+                    SystemNotificationHelper.showBatch(context, toNotify)
+                }
+            }
+
+            return@withContext ActivitySyncOutcome(
+                newEvents = newStored,
+                serverItems = items,
+                beranda = null,
+            )
+        }
+
+        // Fallback kompatibilitas jika VPS belum di-update ke endpoint /api/v1/notifikasi
         val (laundryRes, penghuniRes, berandaRes) = coroutineScope {
             val laundryDeferred = async { repository.fetchLaundryList(periode = "7_hari", tampil = 40) }
             val penghuniDeferred = async { repository.fetchPenghuniList(tab = "semua") }
@@ -289,4 +362,7 @@ class ActivitySyncEngine(
             p.kamarNomor.orEmpty(),
             p.noWa.orEmpty(),
         ).joinToString("|")
+
+    private fun Set<String>.takeLastCompat(maxSize: Int): Set<String> =
+        if (size <= maxSize) this else toList().takeLast(maxSize).toSet()
 }

@@ -74,6 +74,9 @@ interface LaundryKosApi {
     @GET("beranda")
     suspend fun beranda(@Query("bulan") bulan: String? = null): BerandaResponseDto
 
+    @GET("notifikasi")
+    suspend fun notifikasi(): ServerNotifikasiResponseDto
+
     // --- Pengaturan ---
     @GET("pengaturan")
     suspend fun pengaturan(@Query("tanggal") tanggal: String? = null): PengaturanResponseDto

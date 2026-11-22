@@ -75,6 +75,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -298,6 +300,11 @@ private fun AuthenticatedAppShell(
             isGlobalRole = isGlobalRole,
         ),
     )
+
+    // Langsung sinkronkan notifikasi begitu aplikasi kembali dibuka dari background/sleep
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        notifikasiViewModel.refresh(emitSystem = true)
+    }
 
     fun navigateTopLevel(route: String) {
         if (currentRoute == route) return
