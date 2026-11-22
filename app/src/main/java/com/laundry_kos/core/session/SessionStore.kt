@@ -24,6 +24,7 @@ data class StoredSession(
     val token: String? = null,
     val propertiId: Int? = null,
     val userId: Int? = null,
+    val fcmToken: String? = null,
     val loaded: Boolean = false,
 )
 
@@ -43,6 +44,9 @@ class SessionStore(context: Context) {
     val currentUserId: Int?
         get() = _state.value.userId
 
+    val currentFcmToken: String?
+        get() = _state.value.fcmToken
+
     init {
         scope.launch {
             dataStore.data.collect { prefs ->
@@ -50,6 +54,7 @@ class SessionStore(context: Context) {
                     token = prefs[KEY_TOKEN]?.takeIf { it.isNotBlank() },
                     propertiId = prefs[KEY_PROPERTI_ID],
                     userId = prefs[KEY_USER_ID],
+                    fcmToken = prefs[KEY_FCM_TOKEN]?.takeIf { it.isNotBlank() },
                     loaded = true,
                 )
             }
@@ -63,6 +68,7 @@ class SessionStore(context: Context) {
             token = prefs[KEY_TOKEN]?.takeIf { it.isNotBlank() },
             propertiId = prefs[KEY_PROPERTI_ID],
             userId = prefs[KEY_USER_ID],
+            fcmToken = prefs[KEY_FCM_TOKEN]?.takeIf { it.isNotBlank() },
             loaded = true,
         )
         _state.value = loaded
@@ -103,6 +109,16 @@ class SessionStore(context: Context) {
         }
     }
 
+    suspend fun saveFcmToken(fcmToken: String?) {
+        dataStore.edit { prefs ->
+            if (!fcmToken.isNullOrBlank()) {
+                prefs[KEY_FCM_TOKEN] = fcmToken
+            } else {
+                prefs.remove(KEY_FCM_TOKEN)
+            }
+        }
+    }
+
     suspend fun clearSession() {
         dataStore.edit { prefs ->
             prefs.remove(KEY_TOKEN)
@@ -115,5 +131,6 @@ class SessionStore(context: Context) {
         private val KEY_TOKEN = stringPreferencesKey("sanctum_token")
         private val KEY_PROPERTI_ID = intPreferencesKey("active_properti_id")
         private val KEY_USER_ID = intPreferencesKey("current_user_id")
+        private val KEY_FCM_TOKEN = stringPreferencesKey("fcm_device_token")
     }
 }

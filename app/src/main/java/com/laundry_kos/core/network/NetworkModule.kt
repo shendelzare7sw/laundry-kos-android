@@ -52,6 +52,9 @@ class AuthHeadersInterceptor(
             sessionStore.currentPropertiId?.let { propertiId ->
                 builder.header("X-Properti-Id", propertiId.toString())
             }
+            sessionStore.currentFcmToken?.let { fcmToken ->
+                builder.header("X-Device-Token", fcmToken)
+            }
         }
 
         return chain.proceed(builder.build())

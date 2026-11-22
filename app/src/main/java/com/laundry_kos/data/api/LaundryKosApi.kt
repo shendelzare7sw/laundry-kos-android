@@ -22,6 +22,12 @@ interface LaundryKosApi {
     @GET("me")
     suspend fun me(): MeResponseDto
 
+    @POST("device-token")
+    suspend fun registerDeviceToken(@Body request: DeviceTokenRequestDto): MessageResponseDto
+
+    @DELETE("device-token")
+    suspend fun unregisterDeviceToken(): MessageResponseDto
+
     @GET("properti")
     suspend fun properti(): PropertiListResponseDto
 

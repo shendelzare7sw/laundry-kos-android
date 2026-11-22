@@ -66,8 +66,26 @@ class LaundryKosRepository(
     }
 
     suspend fun logout() {
+        runCatching { api.unregisterDeviceToken() }
         runCatching { api.logout() }
         sessionStore.clearSession()
+    }
+
+    suspend fun registerDeviceToken(fcmToken: String) {
+        val clean = fcmToken.trim()
+        if (clean.length < 20) return
+        sessionStore.saveFcmToken(clean)
+        if (sessionStore.currentToken.isNullOrBlank()) return
+        val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim().ifBlank { "Android" }
+        runCatching {
+            api.registerDeviceToken(
+                DeviceTokenRequestDto(
+                    token = clean,
+                    platform = "android",
+                    deviceName = deviceName,
+                ),
+            )
+        }
     }
 
     suspend fun fetchProperti(): ApiResult<PropertiListResponseDto> =

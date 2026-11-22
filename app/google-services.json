@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "279781772525",
+    "project_id": "laundry-kos",
+    "storage_bucket": "laundry-kos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:279781772525:android:553a0c238206050d2850e4",
+        "android_client_info": {
+          "package_name": "com.laundry_kos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAUG78lD6UPP7g5YFxwXyTTm3pGDtablP0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

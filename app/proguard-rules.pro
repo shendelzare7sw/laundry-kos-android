@@ -17,6 +17,7 @@
     *** Companion;
 }
 -keep class com.laundry_kos.core.notifikasi.ActivitySyncWorker { *; }
+-keep class com.laundry_kos.core.notifikasi.LaundryFirebaseMessagingService { *; }
 
 # Retrofit: pertahankan interface API dan signature suspend/generic
 -keep,allowobfuscation,allowshrinking interface com.laundry_kos.data.api.LaundryKosApi { *; }

@@ -21,3 +21,10 @@ data class ServerNotifikasiResponseDto(
     val items: List<ServerNotifikasiItemDto> = emptyList(),
     @SerialName("server_time_ms") val serverTimeMs: Long? = null,
 )
+
+@Serializable
+data class DeviceTokenRequestDto(
+    val token: String,
+    val platform: String = "android",
+    @SerialName("device_name") val deviceName: String? = null,
+)

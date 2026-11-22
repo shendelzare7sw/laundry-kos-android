@@ -9,6 +9,7 @@ import com.laundry_kos.core.network.ApiError
 import com.laundry_kos.core.network.ApiResult
 import com.laundry_kos.core.network.GlobalApiEvent
 import com.laundry_kos.core.notifikasi.ActivitySyncWorker
+import com.laundry_kos.core.notifikasi.FcmTokenRegistrar
 import com.laundry_kos.core.notifikasi.NotificationStore
 import com.laundry_kos.core.notifikasi.SystemNotificationHelper
 import com.laundry_kos.data.dto.PermissionsDto
@@ -136,6 +137,7 @@ class SessionViewModel(
                 is ApiResult.Success -> {
                     val user = res.data.user
                     ActivitySyncWorker.schedule(appContext)
+                    FcmTokenRegistrar.sync(repository)
                     // Sesuai workflow web (AuthenticatedSessionController & PastikanPropertiAktif):
                     // Owner / DevAdmin tanpa properti terpilih di sesi tetap mendarat di layar Pilih Gedung.
                     if (isGlobalRole(user) && saved.propertiId == null) {
@@ -179,6 +181,7 @@ class SessionViewModel(
                 is ApiResult.Success -> {
                     val user = res.data.user
                     ActivitySyncWorker.schedule(appContext)
+                    FcmTokenRegistrar.sync(repository)
                     // Persis AuthenticatedSessionController::store di Laravel Web:
                     // Owner & DevAdmin SELALU diarahkan ke Pilih Gedung dahulu setelah login!
                     if (isGlobalRole(user)) {
