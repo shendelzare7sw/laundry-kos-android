@@ -151,6 +151,7 @@ data class SimpanLaundryRequestDto(
     @SerialName("nama_tanpa_nama") val namaTanpaNama: String? = null,
     @SerialName("berat_kg") val beratKg: String? = null,
     @SerialName("biaya_utama") val biayaUtama: Int? = null,
+    @SerialName("kosongkan_biaya_utama") val kosongkanBiayaUtama: Boolean = false,
     @SerialName("konfirmasi_berat_besar") val konfirmasiBeratBesar: Boolean = false,
     val catatan: String? = null,
     val ref: String? = null,

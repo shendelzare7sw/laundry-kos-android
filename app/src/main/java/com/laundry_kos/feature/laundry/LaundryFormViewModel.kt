@@ -127,7 +127,7 @@ class LaundryFormViewModel(
                             },
                             namaTanpaNama = d.namaTanpaNama ?: "",
                             beratKg = d.beratLabel?.replace(',', '.') ?: "",
-                            biayaManualMode = d.biayaManual,
+                            biayaManualMode = d.biayaManual || ((d.beratCenti ?: 0) > 0 && d.biayaUtama == null),
                             biayaUtamaInput = d.biayaUtama?.toString() ?: "",
                             catatan = d.catatan ?: "",
                             items = d.item.map { sub ->
@@ -199,7 +199,7 @@ class LaundryFormViewModel(
             val nextAuto = Formatters.hitungBiayaUtamaOtomatis(filtered, tarif, minCenti, pembulatan)
             val nextBiaya = when {
                 filtered.isBlank() && !cur.biayaManualMode -> ""
-                !cur.biayaManualMode || cur.biayaUtamaInput.isBlank() -> nextAuto?.toString() ?: ""
+                !cur.biayaManualMode -> nextAuto?.toString() ?: ""
                 else -> cur.biayaUtamaInput
             }
             cur.copy(
@@ -216,7 +216,8 @@ class LaundryFormViewModel(
         _state.update { cur ->
             val autoVal = cur.biayaOtomatisEfektif
             val isManual = if (digits.isBlank()) {
-                false
+                // Mengosongkan biaya (baik tambah maupun edit) dipertahankan agar bisa disimpan tanpa biaya
+                cur.beratKg.isNotBlank() || cur.editId != null
             } else {
                 autoVal == null || digits.toIntOrNull() != autoVal
             }
@@ -288,7 +289,7 @@ class LaundryFormViewModel(
                     ) ?: res.data.biayaOtomatis?.let { Formatters.bulatkanRupiahKeAtas(it, res.data.pembulatan) }
                     val nextBiaya = when {
                         cur.beratKg.isBlank() && !cur.biayaManualMode -> ""
-                        !cur.biayaManualMode || cur.biayaUtamaInput.isBlank() -> autoCost?.toString() ?: ""
+                        !cur.biayaManualMode -> autoCost?.toString() ?: ""
                         else -> cur.biayaUtamaInput
                     }
                     cur.copy(
@@ -384,6 +385,7 @@ class LaundryFormViewModel(
             namaTanpaNama = if (s.jenis == "tanpa_nama") s.namaTanpaNama.trim().takeIf { it.isNotEmpty() } else null,
             beratKg = beratNorm,
             biayaUtama = s.biayaUtamaInput.toIntOrNull(),
+            kosongkanBiayaUtama = beratNorm != null && s.biayaUtamaInput.isBlank(),
             konfirmasiBeratBesar = s.konfirmasiBeratBesar,
             catatan = s.catatan.trim().takeIf { it.isNotEmpty() },
             ref = if (s.editId == null) s.idempotencyRef else null,
