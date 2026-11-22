@@ -126,6 +126,7 @@ data class InfoKuotaResponseDto(
     @SerialName("tarif_per_kg") val tarifPerKg: Int = 8000,
     @SerialName("min_kg") val minKg: String = "2",
     @SerialName("min_kg_centi") val minKgCenti: Int = 200,
+    @SerialName("pembulatan") val pembulatan: Int = 1000,
     @SerialName("biaya_otomatis") val biayaOtomatis: Int? = null,
     val kamar: String? = null,
     val kuota: InfoKuotaPreviewDto? = null,

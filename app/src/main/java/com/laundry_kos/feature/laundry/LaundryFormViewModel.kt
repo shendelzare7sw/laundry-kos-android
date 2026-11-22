@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.laundry_kos.core.network.ApiError
 import com.laundry_kos.core.network.ApiResult
 import com.laundry_kos.core.util.DateUtil
+import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.data.dto.InfoKuotaPenghuniDto
 import com.laundry_kos.data.dto.InfoKuotaResponseDto
 import com.laundry_kos.data.dto.SimpanLaundryItemDto
@@ -65,6 +66,23 @@ data class LaundryFormUiState(
 
     val hasDuplikatBlock: Boolean
         get() = jenis == "penghuni" && preview?.duplikat != null
+
+    /**
+     * Hitungan biaya utama otomatis yang selalu dibulatkan KE ATAS ke kelipatan pembulatan (default Rp1.000),
+     * sinkron langsung saat mengetik maupun setelah respons pratinjau server.
+     */
+    val biayaOtomatisEfektif: Int?
+        get() {
+            val tarif = preview?.tarifPerKg ?: 8000
+            val minCenti = preview?.minKgCenti ?: 200
+            val pembulatan = preview?.pembulatan ?: 1000
+            return Formatters.hitungBiayaUtamaOtomatis(
+                beratText = beratKg,
+                tarifPerKg = tarif,
+                minKgCenti = minCenti,
+                pembulatan = pembulatan,
+            ) ?: preview?.biayaOtomatis?.let { Formatters.bulatkanRupiahKeAtas(it, pembulatan) }
+        }
 }
 
 class LaundryFormViewModel(
@@ -174,10 +192,19 @@ class LaundryFormViewModel(
 
     fun setBeratKg(value: String) {
         val filtered = value.filter { it.isDigit() || it == '.' || it == ',' }
-        _state.update {
-            it.copy(
+        _state.update { cur ->
+            val tarif = cur.preview?.tarifPerKg ?: 8000
+            val minCenti = cur.preview?.minKgCenti ?: 200
+            val pembulatan = cur.preview?.pembulatan ?: 1000
+            val nextAuto = Formatters.hitungBiayaUtamaOtomatis(filtered, tarif, minCenti, pembulatan)
+            val nextBiaya = when {
+                filtered.isBlank() && !cur.biayaManualMode -> ""
+                !cur.biayaManualMode || cur.biayaUtamaInput.isBlank() -> nextAuto?.toString() ?: ""
+                else -> cur.biayaUtamaInput
+            }
+            cur.copy(
                 beratKg = filtered,
-                biayaUtamaInput = if (filtered.isBlank() && !it.biayaManualMode) "" else it.biayaUtamaInput,
+                biayaUtamaInput = nextBiaya,
                 submitError = null,
             )
         }
@@ -187,7 +214,7 @@ class LaundryFormViewModel(
     fun setBiayaUtamaInput(value: String) {
         val digits = value.filter(Char::isDigit)
         _state.update { cur ->
-            val autoVal = cur.preview?.biayaOtomatis
+            val autoVal = cur.biayaOtomatisEfektif
             val isManual = if (digits.isBlank()) {
                 false
             } else {
@@ -205,7 +232,7 @@ class LaundryFormViewModel(
         _state.update { cur ->
             cur.copy(
                 biayaManualMode = false,
-                biayaUtamaInput = cur.preview?.biayaOtomatis?.toString() ?: "",
+                biayaUtamaInput = cur.biayaOtomatisEfektif?.toString() ?: "",
                 submitError = null,
             )
         }
@@ -253,7 +280,12 @@ class LaundryFormViewModel(
                 is ApiResult.Success -> _state.update { cur ->
                     val list = res.data.daftarPenghuni
                     val selectedStillInList = list.firstOrNull { it.id == cur.selectedPenghuniId }
-                    val autoCost = res.data.biayaOtomatis
+                    val autoCost = Formatters.hitungBiayaUtamaOtomatis(
+                        beratText = cur.beratKg,
+                        tarifPerKg = res.data.tarifPerKg,
+                        minKgCenti = res.data.minKgCenti,
+                        pembulatan = res.data.pembulatan,
+                    ) ?: res.data.biayaOtomatis?.let { Formatters.bulatkanRupiahKeAtas(it, res.data.pembulatan) }
                     val nextBiaya = when {
                         cur.beratKg.isBlank() && !cur.biayaManualMode -> ""
                         !cur.biayaManualMode || cur.biayaUtamaInput.isBlank() -> autoCost?.toString() ?: ""

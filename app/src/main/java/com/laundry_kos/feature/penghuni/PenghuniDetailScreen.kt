@@ -79,6 +79,7 @@ import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
+import com.laundry_kos.core.util.RupiahVisualTransformation
 import com.laundry_kos.core.util.WhatsAppIntent
 import com.laundry_kos.data.dto.KamarDto
 import com.laundry_kos.data.dto.UbahPenghuniRequestDto
@@ -766,6 +767,7 @@ fun PenghuniDetailScreen(
                             value = nominal,
                             onValueChange = { nominal = it.filter(Char::isDigit) },
                             label = { Text("Nominal Manual (Rp)") },
+                            visualTransformation = RupiahVisualTransformation,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),

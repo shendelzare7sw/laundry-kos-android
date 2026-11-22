@@ -55,6 +55,8 @@ import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.MaroonPrimaryButton
 import com.laundry_kos.core.designsystem.StatusBadge
+import com.laundry_kos.core.util.Formatters
+import com.laundry_kos.core.util.RupiahVisualTransformation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -233,6 +235,7 @@ fun PropertiSetupScreen(
                                     onValueChange = { v -> viewModel.update { it.copy(tarifPerKg = v.filter(Char::isDigit)) } },
                                     label = { Text("Tarif/kg (Rp)") },
                                     singleLine = true,
+                                    visualTransformation = RupiahVisualTransformation,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f),
                                 )
@@ -289,7 +292,7 @@ fun PropertiSetupScreen(
                                     FilterChip(
                                         selected = uiState.pembulatan == nominal,
                                         onClick = { viewModel.update { it.copy(pembulatan = nominal) } },
-                                        label = { Text("Bulat Rp$nominal") },
+                                        label = { Text("Bulat ${Formatters.formatRupiah(nominal)}") },
                                     )
                                 }
                             }

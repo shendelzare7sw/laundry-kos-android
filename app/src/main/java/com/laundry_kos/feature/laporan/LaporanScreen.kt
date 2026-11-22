@@ -84,6 +84,7 @@ import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.util.Formatters
 import com.laundry_kos.core.util.LaporanPdfPrinter
+import com.laundry_kos.core.util.RupiahVisualTransformation
 import com.laundry_kos.core.util.WhatsAppIntent
 import com.laundry_kos.data.dto.LaporanBarisDto
 import com.laundry_kos.data.dto.LaporanKartuLainnyaDto
@@ -691,9 +692,10 @@ private fun LaporanPenghuniDetailCard(
                                 ) {
                                     OutlinedTextField(
                                         value = inlineNominal,
-                                        onValueChange = onInlineNominalChange,
+                                        onValueChange = { onInlineNominalChange(it.filter(Char::isDigit)) },
                                         prefix = { Text("Rp ", fontWeight = FontWeight.Bold, color = ext.danger) },
                                         singleLine = true,
+                                        visualTransformation = RupiahVisualTransformation,
                                         keyboardOptions = KeyboardOptions(
                                             keyboardType = KeyboardType.Number,
                                             imeAction = ImeAction.Done,

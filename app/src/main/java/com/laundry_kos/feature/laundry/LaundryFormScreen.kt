@@ -57,6 +57,7 @@ import com.laundry_kos.core.designsystem.SearchableDropdownField
 import com.laundry_kos.core.designsystem.StatusBadge
 import com.laundry_kos.core.util.DateUtil
 import com.laundry_kos.core.util.Formatters
+import com.laundry_kos.core.util.RupiahVisualTransformation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -357,6 +358,7 @@ fun LaundryFormScreen(
                                 placeholder = { Text("Otomatis terisi saat berat diisi") },
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
+                                visualTransformation = RupiahVisualTransformation,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 isError = uiState.submitError?.firstFieldError("biaya_utama") != null,
                                 supportingText = uiState.submitError?.firstFieldError("biaya_utama")?.let { { Text(it) } },
@@ -368,7 +370,7 @@ fun LaundryFormScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                val autoCost = preview?.biayaOtomatis
+                                val autoCost = uiState.biayaOtomatisEfektif
                                 val helperText = when {
                                     autoCost == null -> "Otomatis terisi saat berat kg dimasukkan."
                                     uiState.biayaManualMode -> "Biaya manual aktif (otomatis: ${Formatters.formatRupiah(autoCost)})"
@@ -492,6 +494,7 @@ fun LaundryFormScreen(
                                             label = { Text("Biaya (Rp)") },
                                             singleLine = true,
                                             shape = RoundedCornerShape(12.dp),
+                                            visualTransformation = RupiahVisualTransformation,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1.4f),
                                         )

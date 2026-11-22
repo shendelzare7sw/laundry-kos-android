@@ -51,6 +51,8 @@ import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.LaundrySnackbarHost
 import com.laundry_kos.core.designsystem.MaroonPrimaryButton
 import com.laundry_kos.core.designsystem.StatusBadge
+import com.laundry_kos.core.util.Formatters
+import com.laundry_kos.core.util.RupiahVisualTransformation
 import com.laundry_kos.data.dto.PropertiDto
 import com.laundry_kos.data.dto.UserDto
 
@@ -200,6 +202,7 @@ fun PengaturanScreen(
                                     onValueChange = { v -> viewModel.updateState { it.copy(tarifPerKg = v.filter(Char::isDigit)) } },
                                     label = { Text("Tarif / kg (Rp)") },
                                     singleLine = true,
+                                    visualTransformation = RupiahVisualTransformation,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f),
                                 )
@@ -255,7 +258,7 @@ fun PengaturanScreen(
                                 )
                             }
 
-                            Text("Pembulatan Tagihan Lewat Kuota (Rp)", style = MaterialTheme.typography.labelMedium, color = ext.muted)
+                            Text("Pembulatan Biaya & Tagihan (Rp)", style = MaterialTheme.typography.labelMedium, color = ext.muted)
                             Row(
                                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -264,7 +267,7 @@ fun PengaturanScreen(
                                     FilterChip(
                                         selected = uiState.pembulatan == nominal,
                                         onClick = { viewModel.updateState { it.copy(pembulatan = nominal) } },
-                                        label = { Text("Rp$nominal") },
+                                        label = { Text(Formatters.formatRupiah(nominal)) },
                                     )
                                 }
                             }
