@@ -15,16 +15,27 @@ val localProps = Properties().apply {
     }
 }
 
+fun resolveProp(key: String): String? =
+    (project.findProperty(key) as? String)?.takeIf { it.isNotBlank() }
+        ?: localProps.getProperty(key)?.takeIf { it.isNotBlank() }
+
 fun resolveBaseUrl(key: String, defaultValue: String): String {
-    val raw = (project.findProperty(key) as? String)
-        ?: localProps.getProperty(key)
-        ?: defaultValue
+    val raw = resolveProp(key) ?: defaultValue
     val trimmed = raw.trim().removeSurrounding("\"")
     return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
 }
 
 val apiBaseUrlDebug = resolveBaseUrl("API_BASE_URL_DEBUG", "http://127.0.0.1:8000/api/v1/")
 val apiBaseUrlRelease = resolveBaseUrl("API_BASE_URL_RELEASE", "https://laundrykos.example.com/api/v1/")
+
+val releaseStoreFile = resolveProp("RELEASE_STORE_FILE")
+val releaseStorePassword = resolveProp("RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = resolveProp("RELEASE_KEY_ALIAS")
+val releaseKeyPassword = resolveProp("RELEASE_KEY_PASSWORD")
+val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
 
 android {
     namespace = "com.laundry_kos"
@@ -40,13 +51,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    if (hasReleaseSigning) {
+        signingConfigs {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrlDebug\"")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrlRelease\"")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

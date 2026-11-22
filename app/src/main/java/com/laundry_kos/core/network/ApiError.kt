@@ -90,16 +90,16 @@ object ApiErrorParser {
             parseBody(t.code(), body)
         }
         is SocketTimeoutException -> ApiError(
-            message = "Koneksi ke server melebihi batas waktu. Pastikan server Laravel aktif.",
+            message = "Koneksi ke server melebihi batas waktu. Periksa jaringan Anda lalu coba lagi.",
         )
         is ConnectException, is UnknownHostException -> ApiError(
-            message = "Tidak dapat terhubung ke server API. Periksa koneksi, php artisan serve, atau adb reverse.",
+            message = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda lalu coba lagi.",
         )
         is IOException -> ApiError(
-            message = "Gangguan jaringan: ${t.localizedMessage ?: "periksa koneksi Anda."}",
+            message = "Gangguan jaringan. Periksa koneksi internet Anda lalu coba lagi.",
         )
         else -> ApiError(
-            message = t.localizedMessage ?: "Terjadi galat tak terduga.",
+            message = "Terjadi galat tak terduga. Silakan coba lagi.",
         )
     }
 

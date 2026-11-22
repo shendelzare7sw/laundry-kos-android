@@ -53,8 +53,6 @@ class SessionViewModel(
     private val _state = MutableStateFlow<SessionUiState>(SessionUiState.Checking)
     val state: StateFlow<SessionUiState> = _state.asStateFlow()
 
-    val storedSession = repository.sessionStore.state
-
     init {
         observeGlobalEvents()
         bootstrap()
@@ -329,12 +327,6 @@ class SessionViewModel(
                 propertiList = current.propertiList,
             )
             refreshPropertiList()
-        }
-    }
-
-    fun updateDebugBaseUrl(url: String) {
-        viewModelScope.launch {
-            repository.sessionStore.saveDebugBaseUrl(url)
         }
     }
 

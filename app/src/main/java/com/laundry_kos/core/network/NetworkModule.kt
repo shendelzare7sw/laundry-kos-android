@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -31,34 +30,6 @@ class ApiEventBus {
 
     fun emit(event: GlobalApiEvent) {
         _events.tryEmit(event)
-    }
-}
-
-class DynamicBaseUrlInterceptor(
-    private val sessionStore: SessionStore,
-) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val original = chain.request()
-        if (!BuildConfig.DEBUG) {
-            return chain.proceed(original)
-        }
-        val targetBase = sessionStore.currentBaseUrl.toHttpUrlOrNull() ?: return chain.proceed(original)
-        val defaultBase = BuildConfig.API_BASE_URL.toHttpUrlOrNull() ?: return chain.proceed(original)
-
-        if (targetBase.scheme == defaultBase.scheme &&
-            targetBase.host == defaultBase.host &&
-            targetBase.port == defaultBase.port
-        ) {
-            return chain.proceed(original)
-        }
-
-        val newUrl = original.url.newBuilder()
-            .scheme(targetBase.scheme)
-            .host(targetBase.host)
-            .port(targetBase.port)
-            .build()
-
-        return chain.proceed(original.newBuilder().url(newUrl).build())
     }
 }
 
@@ -97,7 +68,6 @@ object NetworkModule {
 
     fun createApi(sessionStore: SessionStore): LaundryKosApi {
         val clientBuilder = OkHttpClient.Builder()
-            .addInterceptor(DynamicBaseUrlInterceptor(sessionStore))
             .addInterceptor(AuthHeadersInterceptor(sessionStore))
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

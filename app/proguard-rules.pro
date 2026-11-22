@@ -1,21 +1,28 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Laundry-Kos Production R8 / ProGuard Rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Pertahankan nama file & baris stacktrace crash untuk diagnosa produksi
+-keepattributes SourceFile,LineNumberTable,*Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Kotlinx Serialization: pertahankan serializer & companion untuk semua @Serializable DTO
+-keep,includedescriptorclasses class com.laundry_kos.data.dto.**$$serializer { *; }
+-keepclassmembers class com.laundry_kos.data.dto.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.laundry_kos.data.dto.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.laundry_kos.core.network.ApiErrorPayload** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Retrofit: pertahankan interface API dan signature suspend/generic
+-keep,allowobfuscation,allowshrinking interface com.laundry_kos.data.api.LaundryKosApi { *; }
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+# OkHttp / Okio optional platform classes
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**

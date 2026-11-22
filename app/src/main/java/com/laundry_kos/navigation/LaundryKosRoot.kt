@@ -134,7 +134,6 @@ fun LaundryKosRoot(
 ) {
     val sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.Factory(repository))
     val sessionState by sessionViewModel.state.collectAsStateWithLifecycle()
-    val storedSession by sessionViewModel.storedSession.collectAsStateWithLifecycle()
 
     when (val state = sessionState) {
         SessionUiState.Checking -> {
@@ -145,9 +144,7 @@ fun LaundryKosRoot(
         is SessionUiState.Unauthenticated -> {
             LoginScreen(
                 uiState = state,
-                currentBaseUrl = storedSession.baseUrl,
                 onLogin = sessionViewModel::login,
-                onChangeDebugUrl = sessionViewModel::updateDebugBaseUrl,
             )
         }
         is SessionUiState.SelectProperti -> {

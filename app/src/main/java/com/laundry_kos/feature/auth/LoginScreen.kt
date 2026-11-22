@@ -5,8 +5,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,25 +22,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,26 +48,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.laundry_kos.BuildConfig
 import com.laundry_kos.R
 import com.laundry_kos.core.designsystem.LaundryCard
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.MaroonPrimaryButton
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LoginScreen(
     uiState: SessionUiState.Unauthenticated,
-    currentBaseUrl: String,
     onLogin: (username: String, password: String) -> Unit,
-    onChangeDebugUrl: (String) -> Unit,
 ) {
     val ext = LaundryKosTheme.extendedColors
     var username by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
-    var showServerConfig by rememberSaveable { mutableStateOf(false) }
-    var customUrlInput by remember(currentBaseUrl) { mutableStateOf(currentBaseUrl) }
 
     val usernameError = uiState.loginError?.firstFieldError("username")
     val passwordError = uiState.loginError?.firstFieldError("password")
@@ -201,67 +188,6 @@ fun LoginScreen(
                     onClick = { onLogin(username, password) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-            }
-        }
-
-        if (BuildConfig.DEBUG) {
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(onClick = { showServerConfig = !showServerConfig }) {
-                Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.size(6.dp))
-                Text("Server Dev: $currentBaseUrl", style = MaterialTheme.typography.labelMedium)
-            }
-
-            if (showServerConfig) {
-                LaundryCard(
-                    modifier = Modifier.widthIn(max = 460.dp),
-                    containerColor = ext.surfaceAlt,
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Pilih Server Lokal (Debug)",
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val usbUrl = "http://127.0.0.1:8000/api/v1/"
-                            val emuUrl = "http://10.0.2.2:8000/api/v1/"
-                            FilterChip(
-                                selected = currentBaseUrl == usbUrl,
-                                onClick = {
-                                    customUrlInput = usbUrl
-                                    onChangeDebugUrl(usbUrl)
-                                },
-                                label = { Text("HP Fisik (adb reverse)") },
-                            )
-                            FilterChip(
-                                selected = currentBaseUrl == emuUrl,
-                                onClick = {
-                                    customUrlInput = emuUrl
-                                    onChangeDebugUrl(emuUrl)
-                                },
-                                label = { Text("Emulator (10.0.2.2)") },
-                            )
-                        }
-                        OutlinedTextField(
-                            value = customUrlInput,
-                            onValueChange = { customUrlInput = it },
-                            label = { Text("Base URL API (IP LAN / Custom)") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            OutlinedButton(
-                                onClick = { onChangeDebugUrl(customUrlInput) },
-                            ) {
-                                Text("Terapkan URL")
-                            }
-                        }
-                    }
-                }
             }
         }
     }
