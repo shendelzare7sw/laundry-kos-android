@@ -256,16 +256,16 @@ fun LaundrySnackbarHost(
             msg.contains("galat", ignoreCase = true) ||
             msg.contains("belum", ignoreCase = true)
 
-        // Desain cerah dengan transparansi 30% (alpha = 0.70f) dan teks hitam tegas
+        // Desain solid cerah (tanpa transparan) dengan teks hitam tegas dan bayangan halus
         val containerColor = if (isError) {
-            Color(0xFFFFF1F2).copy(alpha = 0.72f)
+            Color(0xFFFFF1F2)
         } else {
-            Color(0xFFFFFDF9).copy(alpha = 0.70f)
+            Color(0xFFFFFDF9)
         }
         val borderColor = if (isError) {
-            ext.danger.copy(alpha = 0.45f)
+            ext.danger.copy(alpha = 0.55f)
         } else {
-            ext.lineStrong.copy(alpha = 0.85f)
+            ext.lineStrong
         }
         val icon = if (isError) Icons.Default.ErrorOutline else Icons.Default.CheckCircle
         val iconTint = if (isError) ext.danger else ext.ok
@@ -279,7 +279,7 @@ fun LaundrySnackbarHost(
             color = containerColor,
             contentColor = textColor,
             border = BorderStroke(1.dp, borderColor),
-            shadowElevation = 0.dp,
+            shadowElevation = 4.dp,
         ) {
             Row(
                 modifier = Modifier
