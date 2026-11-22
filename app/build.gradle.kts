@@ -25,7 +25,7 @@ fun resolveBaseUrl(key: String, defaultValue: String): String {
     return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
 }
 
-val apiBaseUrlDebug = resolveBaseUrl("API_BASE_URL_DEBUG", "http://127.0.0.1:8000/api/v1/")
+val apiBaseUrlDebug = resolveBaseUrl("API_BASE_URL_DEBUG", "https://laundrykos.my.id/api/v1/")
 val apiBaseUrlRelease = resolveBaseUrl("API_BASE_URL_RELEASE", "https://laundrykos.my.id/api/v1/")
 
 val releaseStoreFile = resolveProp("RELEASE_STORE_FILE")
