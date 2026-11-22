@@ -1,5 +1,7 @@
 package com.laundry_kos.navigation
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,6 +91,7 @@ import com.laundry_kos.feature.auth.LoginScreen
 import com.laundry_kos.feature.auth.PropertiPickerScreen
 import com.laundry_kos.feature.auth.SessionUiState
 import com.laundry_kos.feature.auth.SessionViewModel
+import com.laundry_kos.feature.auth.SplashScreen
 import com.laundry_kos.feature.beranda.BerandaScreen
 import com.laundry_kos.feature.beranda.BerandaViewModel
 import com.laundry_kos.feature.laporan.LaporanScreen
@@ -110,6 +113,7 @@ import com.laundry_kos.feature.penghuni.PenghuniListScreen
 import com.laundry_kos.feature.penghuni.PenghuniListViewModel
 import com.laundry_kos.feature.properti.PropertiSetupScreen
 import com.laundry_kos.feature.properti.PropertiSetupViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class OperasionalTab(
@@ -135,34 +139,48 @@ fun LaundryKosRoot(
 ) {
     val sessionViewModel: SessionViewModel = viewModel(factory = SessionViewModel.Factory(container))
     val sessionState by sessionViewModel.state.collectAsStateWithLifecycle()
+    var minSplashElapsed by remember { mutableStateOf(false) }
 
-    when (val state = sessionState) {
-        SessionUiState.Checking -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        }
-        is SessionUiState.Unauthenticated -> {
-            LoginScreen(
-                uiState = state,
-                onLogin = sessionViewModel::login,
-            )
-        }
-        is SessionUiState.SelectProperti -> {
-            OwnerGedungNavHost(
-                uiState = state,
-                container = container,
-                sessionViewModel = sessionViewModel,
-            )
-        }
-        is SessionUiState.Authenticated -> {
-            key(state.propertiAktif.id) {
-                AuthenticatedAppShell(
-                    authState = state,
-                    container = container,
-                    onReleaseProperti = sessionViewModel::releaseProperti,
-                    onLogout = sessionViewModel::logout,
-                )
+    LaunchedEffect(Unit) {
+        delay(1_150L)
+        minSplashElapsed = true
+    }
+
+    val showSplash = !minSplashElapsed || sessionState is SessionUiState.Checking
+
+    Crossfade(
+        targetState = showSplash,
+        animationSpec = tween(durationMillis = 320),
+        label = "rootSplashCrossfade",
+    ) { inSplash ->
+        if (inSplash) {
+            SplashScreen()
+        } else {
+            when (val state = sessionState) {
+                SessionUiState.Checking -> SplashScreen()
+                is SessionUiState.Unauthenticated -> {
+                    LoginScreen(
+                        uiState = state,
+                        onLogin = sessionViewModel::login,
+                    )
+                }
+                is SessionUiState.SelectProperti -> {
+                    OwnerGedungNavHost(
+                        uiState = state,
+                        container = container,
+                        sessionViewModel = sessionViewModel,
+                    )
+                }
+                is SessionUiState.Authenticated -> {
+                    key(state.propertiAktif.id) {
+                        AuthenticatedAppShell(
+                            authState = state,
+                            container = container,
+                            onReleaseProperti = sessionViewModel::releaseProperti,
+                            onLogout = sessionViewModel::logout,
+                        )
+                    }
+                }
             }
         }
     }

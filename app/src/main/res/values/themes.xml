@@ -4,7 +4,7 @@
         <item name="android:colorPrimary">@color/maroon</item>
         <item name="android:colorPrimaryDark">@color/maroon_dark</item>
         <item name="android:colorAccent">@color/gold</item>
-        <item name="android:windowBackground">@color/bg_cream</item>
+        <item name="android:windowBackground">@color/maroon</item>
         <item name="android:statusBarColor">@color/maroon</item>
         <item name="android:navigationBarColor">@color/surface_white</item>
     </style>
