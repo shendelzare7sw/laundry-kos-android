@@ -40,6 +40,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -76,11 +78,22 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_laundry_mark),
-            contentDescription = stringResource(R.string.app_name),
-            modifier = Modifier.size(72.dp),
-        )
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, ext.line),
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(76.dp),
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.app_logo_favicon),
+                contentDescription = stringResource(R.string.app_name),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(6.dp),
+            )
+        }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.app_name),
@@ -213,6 +226,8 @@ private fun LoginNoticeBanner(
         else -> Icons.Default.Warning
     }
 
+    val hasTitle = !title.isNullOrBlank()
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -222,8 +237,8 @@ private fun LoginNoticeBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.Top,
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = if (hasTitle) Alignment.Top else Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Icon(
@@ -231,13 +246,16 @@ private fun LoginNoticeBanner(
                 contentDescription = null,
                 tint = iconColor,
                 modifier = Modifier
-                    .padding(top = 2.dp)
+                    .then(if (hasTitle) Modifier.padding(top = 2.dp) else Modifier)
                     .size(20.dp),
             )
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                if (!title.isNullOrBlank()) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                if (hasTitle) {
                     Text(
-                        text = title,
+                        text = title!!,
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = titleColor,
                     )

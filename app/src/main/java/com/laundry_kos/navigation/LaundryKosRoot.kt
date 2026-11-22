@@ -311,11 +311,19 @@ private fun AuthenticatedAppShell(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Image(
-                            painter = painterResource(R.drawable.ic_laundry_mark),
-                            contentDescription = stringResource(R.string.app_name),
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.White,
                             modifier = Modifier.size(38.dp),
-                        )
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.app_logo_favicon),
+                                contentDescription = stringResource(R.string.app_name),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(4.dp),
+                            )
+                        }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.app_name).uppercase(),
