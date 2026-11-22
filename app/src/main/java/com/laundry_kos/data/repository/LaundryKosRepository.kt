@@ -75,7 +75,8 @@ class LaundryKosRepository(
         val clean = fcmToken.trim()
         if (clean.length < 20) return
         sessionStore.saveFcmToken(clean)
-        if (sessionStore.currentToken.isNullOrBlank()) return
+        val authToken = sessionStore.currentToken ?: sessionStore.awaitLoaded().token
+        if (authToken.isNullOrBlank()) return
         val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim().ifBlank { "Android" }
         runCatching {
             api.registerDeviceToken(

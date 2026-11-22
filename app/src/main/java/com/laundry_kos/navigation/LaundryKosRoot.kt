@@ -90,6 +90,7 @@ import com.laundry_kos.R
 import com.laundry_kos.core.designsystem.LaundryKosTheme
 import com.laundry_kos.core.designsystem.rememberIsWideLayout
 import com.laundry_kos.core.di.AppContainer
+import com.laundry_kos.core.notifikasi.FcmTokenRegistrar
 import com.laundry_kos.data.repository.LaundryKosRepository
 import com.laundry_kos.feature.auth.LoginScreen
 import com.laundry_kos.feature.auth.PropertiPickerScreen
@@ -301,8 +302,14 @@ private fun AuthenticatedAppShell(
         ),
     )
 
-    // Langsung sinkronkan notifikasi begitu aplikasi kembali dibuka dari background/sleep
+    // Pastikan token FCM perangkat selalu terdaftar ke server setelah login / ganti properti
+    LaunchedEffect(authState.user.id, authState.propertiAktif.id) {
+        FcmTokenRegistrar.sync(repository)
+    }
+
+    // Langsung sinkronkan notifikasi & pastikan token FCM terdaftar saat aplikasi kembali aktif
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        FcmTokenRegistrar.sync(repository)
         notifikasiViewModel.refresh(emitSystem = true)
     }
 

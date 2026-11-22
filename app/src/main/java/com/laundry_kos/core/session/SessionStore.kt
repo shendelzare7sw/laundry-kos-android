@@ -76,6 +76,12 @@ class SessionStore(context: Context) {
     }
 
     suspend fun saveSession(token: String, propertiId: Int?, userId: Int? = null) {
+        _state.value = _state.value.copy(
+            token = token,
+            propertiId = propertiId,
+            userId = userId ?: _state.value.userId,
+            loaded = true,
+        )
         dataStore.edit { prefs ->
             prefs[KEY_TOKEN] = token
             if (propertiId != null) {
@@ -90,6 +96,7 @@ class SessionStore(context: Context) {
     }
 
     suspend fun saveUserId(userId: Int?) {
+        _state.value = _state.value.copy(userId = userId, loaded = true)
         dataStore.edit { prefs ->
             if (userId != null) {
                 prefs[KEY_USER_ID] = userId
@@ -100,6 +107,7 @@ class SessionStore(context: Context) {
     }
 
     suspend fun savePropertiId(propertiId: Int?) {
+        _state.value = _state.value.copy(propertiId = propertiId, loaded = true)
         dataStore.edit { prefs ->
             if (propertiId != null) {
                 prefs[KEY_PROPERTI_ID] = propertiId
@@ -110,9 +118,11 @@ class SessionStore(context: Context) {
     }
 
     suspend fun saveFcmToken(fcmToken: String?) {
+        val clean = fcmToken?.takeIf { it.isNotBlank() }
+        _state.value = _state.value.copy(fcmToken = clean, loaded = true)
         dataStore.edit { prefs ->
-            if (!fcmToken.isNullOrBlank()) {
-                prefs[KEY_FCM_TOKEN] = fcmToken
+            if (clean != null) {
+                prefs[KEY_FCM_TOKEN] = clean
             } else {
                 prefs.remove(KEY_FCM_TOKEN)
             }
@@ -120,6 +130,12 @@ class SessionStore(context: Context) {
     }
 
     suspend fun clearSession() {
+        _state.value = _state.value.copy(
+            token = null,
+            propertiId = null,
+            userId = null,
+            loaded = true,
+        )
         dataStore.edit { prefs ->
             prefs.remove(KEY_TOKEN)
             prefs.remove(KEY_PROPERTI_ID)
